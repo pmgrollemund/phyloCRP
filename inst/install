@@ -1,0 +1,4 @@
+#!/bin/bash
+
+cd ~/Documents/Postdoc/HIV_transmission/Code/CRP/package
+R CMD INSTALL phyloCRP_0.1.0.tar.gz
