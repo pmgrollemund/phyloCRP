@@ -342,9 +342,6 @@ arma::vec subcrp_size_cpp(arma::vec & crp_size,  double prob) {
  for(int k=0 ; k<v.size() ; ++k){
   v(k) = R::rbinom(crp_size(k),prob) ;
  }
-
- // std::transform( crp_size.begin(), crp_size.end(), v.begin(),
- //                 [=](double size){ return R::rbinom(size, prob); });
  return(v);
 }
 
