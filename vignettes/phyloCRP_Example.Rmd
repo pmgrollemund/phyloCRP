@@ -1,0 +1,512 @@
+---
+title: "Application of the statistical model on the subtrees"
+author: "Paul-Marie Grollemund"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+ html_document: 
+ toc: true # table of content true
+toc_depth: 6  # upto three depths of headings (specified by #, ## and ###)
+number_sections: true  ## if you want number sections at each table header
+theme: paper  # many options for theme, this one is my favorite.
+---
+
+```{r setup, include=FALSE}
+options(width = 100)
+knitr::opts_chunk$set(echo = TRUE, dev = c('png','pdf'), fig.width= 12, fig.height=8)
+```
+<script>
+function show_hide(ID) {
+var x = document.getElementById(ID);
+if (x.style.display === "none") {
+x.style.display = "block";
+} else {
+x.style.display = "none";
+}
+}
+function hide(ID) {
+var x = document.getElementById(ID);
+x.style.display = "none";
+}
+</script>
+
+```{r, echo=FALSE}
+# Remove all the object from memory.
+rm(list=ls())
+
+# Define paths
+path_Data <- "../inst/extdata/"
+path_RDS   <- paste(path_Data,"FakeData/",sep="")
+path_tree  <- paste(path_Data,"Tree/",sep="")
+path_plot  <- paste(path_Data,"Colored_tree/",sep="")
+path_clade <- paste(path_Data,"Clades/",sep="")
+```
+
+```{r libs ,warning=FALSE,message=FALSE,echo=FALSE}
+# Packages
+library(ape)
+library(big.phylo)
+library(coda)
+library(data.table)
+library(ggplot2)
+library(memisc)
+library(stringr)
+
+library("phyloCRP", lib.loc="~/R/x86_64-pc-linux-gnu-library/3.5")
+
+# Options 
+name_HXB2_file      <- "./LANL/HXB2.fasta"
+name_HXB2           <- c("B.FR.1983.HXB2-LAI-IIIB-BRU.K03455.M",
+                         "B.FR.1983.HXB2_copy_LAI.AF033819.M")
+bs.n <- 2
+subtypes <- c("01_AE","A1")
+min_occur <- 10 # the threshold to determine the most represented subtypes 
+
+biannual <-
+ c("1980-1982","1983-1984","1985-1986","1987-1988","1989-1990","1991-1992",
+   "1993-1994","1995-1996","1997-1998","1999-2000","2001-2002","2003-2004",
+   "2005-2006","2007-2008","2009-2010","2011-2012","2013-2014","2015-2016",
+   "2017-2018")
+quinquennium <- 
+ c("1980-1984","1984-1988","1989-1993","1994-1998","1999-2003","2004-2008",
+   "2009-2013","2014-2018")
+```
+
+# Introduction
+<button onclick="show_hide('Introduction')">Show/Hide</button>
+
+<div id="Introduction"> 
+
+In this document, we present how to use the proposed approach on a fake dataset.
+Below we use the output subtrees from the 
+`GenomicSequences_to_TransmissionChains.Rmd` script. 
+We also use similar code than in `fit_model.Rmd` script but with slight variations: 
+
+1. The sampling proportion is estimated from epidemiological data, and then the
+hyperparameter values are fixed according to this prior information. 
+2. We slightly change the posterior sampler to take a bootstraped collection 
+of phylogenetic subtrees into account.
+
+The final output are the posterior sample and an estimate of the proportion of 
+introductions.
+
+### Outline
+Below, the sections address: 
+
+1. Preprocess: 
+* Compute the boostrap collection of subtrees (including a rerooting procedure
+and an ancestral state reconstruction, for each bootstrap tree)
+* Estimate the prior sampling proportion 
+* How to load/define the data, define options and define hyperparameters
+2. Application: 
+* How to get a prior sample
+* How to get a posterior sample (for one dataset or for a collection of 
+bootstrap datasets)
+* A quick description of the algorithm (for the bootstrap)
+3. Diagnostics: 
+* Check mixing and convergence
+* Trace plots
+* Effective sample size
+* Assessment of data fitting from the posterior predictive distribution
+4. Results: 
+* Estimates and credible intervals of model parameters 
+* Estimate of proportion of introductions
+
+<button onclick="hide('Introduction')">Hide 'Introduction'</button>
+</div>
+
+
+# Preprocess
+<button onclick="show_hide('Preprocess')">Show/Hide</button>
+<div id="Preprocess"> 
+
+In this Section, we give details about important preprocess steps that are different 
+from the preprocesses that we describe in the `fit_model.Rmd` script.
+
+### Bootstrapped input data
+<button onclick="show_hide('bs')">Show/Hide</button>
+<div id="bs"> 
+Below, we describe how to derive a collection of subtrees collection.
+After running the `GenomicSequences_to_TransmissionChains.Rmd` script, we obtain 
+only one collection of subtrees, in `Data_Example/Clades/Clades_save.RData`.
+If one wants to fit the model only with these subtrees, this Section can be 
+ignored. 
+On the other hand, as we aim to take the input data uncertainty into account, 
+we need to use the following procedure.
+
+<button onclick="hide('bs')">Hide 'Bootstrapped input data'</button>
+</div>
+### Estimate the prior sampling proportion 
+<button onclick="show_hide('prior_sampling')">Show/Hide</button>
+<div id="prior_sampling"> 
+
+In this Section, we describe how to estimate the sampling proportion from 
+epidemiological data. 
+The idea is to compute the proportion of sequenced persons among the diagnosed 
+persons. 
+Notice that:
+
+1. By computing this proportion, we only approximate the 'true' sampling proportion 
+which is the proprotion of sequenced persons in the infected population.
+2. In this document, we focus on the overall sampling proportion.
+Nevertheless, using a slight variation of this script, we can obtain the sampling 
+proportion of a specific population.
+
+
+<b>Estimation of the overall sampling proportion :</b>
+```{r, echo=TRUE, eval=TRUE}
+person <- readRDS(paste(path_RDS,"person_modified.rds",sep=""))
+sequences_meta <- readRDS(paste(path_RDS,"sequences_meta_modified.rds",sep=""))
+
+diagnosed_n_sequenced <- person$newnum %in% sequences_meta$newnum
+p0 <- as.numeric( prop.table(table(diagnosed_n_sequenced))["TRUE"] )
+```
+
+<b>Estimation of the sampling proportion for a specific subgroup:</b>
+```{r, echo=TRUE, eval=TRUE}
+trait <- person$main_transm2 == "IDU"
+ 
+diagnosed_n_sequenced <- person$newnum[trait] %in% sequences_meta$newnum
+p0_IDU <- as.numeric( prop.table(table(diagnosed_n_sequenced))["TRUE"] )
+```
+
+<button onclick="hide('prior_sampling')">Hide 'Estimate the prior sampling proportion'</button>
+</div>
+
+### Load the data
+<button onclick="show_hide('Load_data')">Show/Hide</button>
+<div id="Load_data"> 
+
+Below, we show how to load the subtree sizes and to set up a `data` object 
+for the following functions.
+
+```{r, echo=TRUE, eval=TRUE}
+load(paste(path_clade,"Clades_save.RData",sep=""))
+c <- rev(sort( unlist( lapply(clades,function(clade) length(clade$tip.label)) ) ))
+data <- list(
+ c = as.numeric(c), 
+ N = sum(c), 
+ K = length(c)
+)
+
+plot(data$c,type="o",pch=15,cex=0.7,xlab="k",ylab="c_k")
+```
+
+Notice that for this example, there is a bunch of very small subtrees that is the 
+consequence of adding a high rate of mutations in the viral RNA sequences. 
+In pratice, we expect to get at least some big subtrees. 
+
+If we want to fit bootstrap subtrees, we need to define `data` in a different 
+way, see below.
+```{r, echo=TRUE, eval=TRUE}
+datas <- list() ; length(datas) <- bs.n+1
+
+datas[[1]] <- data
+for(b in 1:bs.n){
+load(paste(path_clade,"Clades_save_",sprintf("%03d",b-1),".RData",sep=""))
+c <- rev(sort( unlist( lapply(clades,function(clade) length(clade$tip.label)) ) ))
+data_tmp <- list(
+ c = as.numeric(c), 
+ N = sum(c), 
+ K = length(c)
+)
+data_tmp$c <- data_tmp$c[data_tmp$c != 0]
+datas[[b+1]] <- data_tmp
+}
+```
+
+<button onclick="hide('Load_data')">Hide 'Load the data'</button>
+</div>
+
+### Define options and hyperparameters
+<button onclick="show_hide('Hyperparameters')">Show/Hide</button>
+<div id="Hyperparameters"> 
+
+In this Section, we deal with hyperparameter values and the options for the 
+sampler algorithm. 
+Below, we describe how to derive hyperparameter values from the 
+prior overall sampling proportion, `p0`, and the ML estimate of alpha, `alpha0`.
+```{r, echo=TRUE, eval=TRUE}
+r0 <- data$N*(1-p0)/p0
+K0 <- data$K / p0
+alpha_estimate <- alpha_estimator(data$c,c(0.1,data$N),nbre_alpha=1e4)
+alpha0 <- alpha_estimate$alpha_hat
+
+hyperparam <- list(
+ lambda1  = alpha0^2,
+ lambda2  = alpha0,
+ eta1 = data$N+1,
+ eta2 = data$N*(1-p0)/p0+1,
+ pi    = 1-p0,         
+ kappa = data$N
+)
+```
+
+The options for the sammpler algorithm are:
+
+* `n_iter`: the size of the output sample
+* `burnin`: the number of iteration for the burnin periode (optional)
+* `lambda`: related to the number of swap moves at each iteration of the 
+Parallel Tempering algorithm (optional)
+* `thin`: to set in order to keep only one iteration every `thin` iterations (optional)
+* `temperatures`: the temperatures for the different chains of the Parallel
+Tempering algorithm. 
+* `target`: a character chain to determine the target distribution, the prior 
+or the posterior (optional).
+
+```{r, echo=TRUE, eval=TRUE}
+param <- list(n_iter = 1e3, 
+              burnin=1e2,
+              lambda=5,
+              thin=5,
+              temperatures = rev(seq(0,1,le=5+1)[-1]))
+param_prior <- param
+param_prior$target <- "prior"
+```
+
+<button onclick="hide('Hyperparameters')">Hide 'Define options and hyperparameters'</button>
+</div>
+
+<button onclick="hide('Preprocess')">Hide 'Preprocess'</button>
+</div>
+
+# Application
+<button onclick="show_hide('Application')">Show/Hide</button>
+<div id="Application"> 
+
+In this Section, we present how to get a prior sample by using a Metropolis Hastings (MH)
+algorithm, or a posterior sample by using a Parallel Tempering (PT) algorithm.
+
+<b> Prior sample: </b> 
+The prior distribution is quite simple to sample, then using a MH is acceptable. 
+There are two provided functions for running this algorithm: `MH` in `R` or `MH_cpp`
+in `Rcpp`. 
+```{r, echo=TRUE, eval=TRUE}
+prior_sample <- MH(param_prior,data,hyperparam)
+prior_sample_cpp <- MH_cpp(param_prior,data,hyperparam,TRUE)
+```
+
+
+<b> Posterior sample: </b> 
+```{r, echo=TRUE, eval=TRUE}
+posterior_sample <- PT(param,data,hyperparam)
+posterior_sample_cpp <- PT_cpp(param,data,hyperparam,TRUE)
+```
+
+```{r, echo=FALSE, eval=TRUE}
+time_R <- as.numeric(posterior_sample$comput_time)
+if(attr(posterior_sample$comput_time,which="units") == "mins"){
+ time_R <- as.numeric(posterior_sample$comput_time) * 60
+}
+if(attr(posterior_sample$comput_time,which="units") == "hours"){
+ time_R <- as.numeric(posterior_sample$comput_time) * 3600
+}
+cat("The Rcpp code is ",as.numeric(time_R  / posterior_sample_cpp$comput_time), 
+    "times faster. \n")
+```
+
+<b> Posterior sample with bootstrap input data: </b> 
+```{r, echo=TRUE, eval=TRUE}
+posterior_sample_bs <- PT_bs(param,datas,hyperparam)
+posterior_sample_bs_cpp <- PT_bs_cpp(param,datas,hyperparam,TRUE)
+```
+
+```{r, echo=FALSE, eval=TRUE}
+time_R <- as.numeric(posterior_sample_bs$comput_time)
+if(attr(posterior_sample_bs$comput_time,which="units") == "mins"){
+ time_R <- as.numeric(posterior_sample_bs$comput_time) * 60
+}
+if(attr(posterior_sample_bs$comput_time,which="units") == "hours"){
+ time_R <- as.numeric(posterior_sample_bs$comput_time) * 3600
+}
+cat("The Rcpp code is ",as.numeric(time_R  / posterior_sample_bs_cpp$comput_time), 
+    "times faster. \n")
+```
+
+<button onclick="hide('Application')">Hide 'Application'</button>
+</div>
+# Diagnostics 
+<button onclick="show_hide('Diagnostics')">Show/Hide</button>
+<div id="Diagnostics"> 
+In this Section, we show how to obtain the outputs (trace and model parameter 
+estimates) and how to compute some diagnostics to assess the convergence of the 
+sampler algorithm.
+
+### For one dataset
+<b> Trace plots: </b> 
+
+For each parameter, we have a MCMC sample for all the target tempered distributions
+of the Parallel Tempering algorithm. 
+As an example, we first show the trace of a model parameter (`alpha`): 
+```{r, echo=TRUE, eval=TRUE}
+plot(posterior_sample_cpp$trace$alpha[,1],type="l")
+```
+Noticed that the numerical results are not so good since we choose a small
+number of iterations and a small number for the thinning. For a real data study, 
+it should be expected to fix these values so that the mixing proporties of the 
+chain are acceptable.
+
+Below, we show for `alpha` the difference between the tempered chains.
+```{r, echo=TRUE, eval=TRUE}
+matplot(posterior_sample_cpp$trace$alpha,type="l",lty=1)
+legend(0, max(posterior_sample_cpp$trace$alpha), legend=paste("Temp:", param$temperatures),
+       col=1:length(param$temperatures), lty=1, cex=0.8)
+
+
+plot(density(posterior_sample_cpp$trace$alpha[,1]),main="",xlab="")
+for(i in 2:length(param$temperatures))
+ lines(density(posterior_sample_cpp$trace$alpha[,i]),col=i)
+legend(min(posterior_sample_cpp$trace$alpha[,1]), 
+       max(density(posterior_sample_cpp$trace$alpha[,1])$y), legend=paste("Temp:", param$temperatures),
+       col=1:length(param$temperatures), lty=1, cex=0.8)
+```
+
+
+<b> Geweke test: </b> 
+```{r ,warning=FALSE,message=FALSE,echo=TRUE, eval=TRUE}
+threshold <- 0.01
+```
+```{r ,warning=FALSE,message=FALSE,echo=TRUE, eval=TRUE}
+mcmc_alpha <- as.mcmc(posterior_sample_cpp$trace$alpha[,1])
+
+geweke_z_alpha    <- geweke.diag(mcmc_alpha)
+geweke_z_alpha    <- 1-pnorm(abs(geweke_z_alpha$z),0,1)
+```
+
+```{r ,warning=FALSE,message=FALSE,echo=FALSE, eval=TRUE}
+if(geweke_z_alpha > threshold) 
+ cat("The p-value of the Geweke test is :", geweke_z_alpha, ".",
+     "Then the null hypothesis is not rejected: the means of the first part and the last part",
+     "of the Markov chain are not significatively different, which could be an",
+     "evidence in support of the convergence of the chain. ") else
+ cat("The p-value of the Geweke test is :", geweke_z_alpha, ".",
+     "Then the null hypothesis is rejected: the means of the first part and the last part",
+     "of the Markov chain are significatively different, which could be an",
+     "evidence in support of the divergence of the chain. ")
+```
+
+<b> Heidelberg test: </b> 
+```{r ,warning=FALSE,message=FALSE,echo=TRUE, eval=TRUE}
+heildel_sta_alpha <- heidel.diag(mcmc_alpha)[3]
+```
+```{r ,warning=FALSE,message=FALSE,echo=FALSE, eval=TRUE}
+if(heildel_sta_alpha > threshold) 
+ cat("The p-value of the Heidelberger and Welch's test is :", heildel_sta_alpha, ".",
+     "Then the null hypothesis is not rejected: the sample values come from a", 
+     "stationary distribution. ") else
+ cat("The p-value of the Heidelberger and Welch's test is :", heildel_sta_alpha, ".",
+     "Then the null hypothesis is rejected: the sample values do not come from a", 
+     "stationary distribution. ")
+```
+
+### For several bootstrap datasets
+Below, we show the same plots as above but with the boostratp input data.
+
+<b> Trace plots: </b> 
+```{r, echo=TRUE, eval=TRUE}
+plot(posterior_sample_bs_cpp$trace$alpha[,1],type="l")
+```
+
+Below, we show for `alpha` the difference between the tempered chains.
+```{r, echo=TRUE, eval=TRUE}
+matplot(posterior_sample_bs_cpp$trace$alpha,type="l",lty=1)
+legend(0, max(posterior_sample_bs_cpp$trace$alpha), legend=paste("Temp:", param$temperatures),
+       col=1:length(param$temperatures), lty=1, cex=0.8)
+
+
+plot(density(posterior_sample_bs_cpp$trace$alpha[,1]),main="",xlab="")
+for(i in 2:length(param$temperatures))
+ lines(density(posterior_sample_bs_cpp$trace$alpha[,i]),col=i)
+legend(mean(posterior_sample_bs_cpp$trace$alpha[,1]), 
+       max(density(posterior_sample_bs_cpp$trace$alpha[,1])$y), legend=paste("Temp:", param$temperatures),
+       col=1:length(param$temperatures), lty=1, cex=0.8)
+```
+
+
+<b> Geweke test: </b> 
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+threshold <- 0.01
+```
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+mcmc_alpha <- as.mcmc(posterior_sample_bs_cpp$trace$alpha[,1])
+
+geweke_z_alpha    <- geweke.diag(mcmc_alpha)
+geweke_z_alpha    <- 1-pnorm(abs(geweke_z_alpha$z),0,1)
+```
+
+```{r ,warning=FALSE,message=FALSE,echo=FALSE, eval=TRUE}
+if(geweke_z_alpha > threshold) 
+ cat("The p-value of the Geweke test is :", geweke_z_alpha, ".",
+     "Then the null hypothesis is not rejected: the means of the first part and the last part",
+     "of the Markov chain are not significatively different, which could be an",
+     "evidence in support of the convergence of the chain. ") else
+ cat("The p-value of the Geweke test is :", geweke_z_alpha, ".",
+     "Then the null hypothesis is rejected: the means of the first part and the last part",
+     "of the Markov chain are significatively different, which could be an",
+     "evidence in support of the divergence of the chain. ")
+```
+
+<b> Heidelberg test: </b> 
+```{r ,warning=FALSE,message=FALSE,echo=TRUE, eval=TRUE}
+heildel_sta_alpha <- heidel.diag(mcmc_alpha)[3]
+```
+```{r ,warning=FALSE,message=FALSE,echo=FALSE, eval=TRUE}
+if(heildel_sta_alpha > threshold) 
+ cat("The p-value of the Heidelberger and Welch's test is :", heildel_sta_alpha, ".",
+     "Then the null hypothesis is not rejected: the sample values come from a", 
+     "stationary distribution. ") else
+ cat("The p-value of the Heidelberger and Welch's test is :", heildel_sta_alpha, ".",
+     "Then the null hypothesis is rejected: the sample values do not come from a", 
+     "stationary distribution. ")
+```
+
+<button onclick="hide('Diagnostics')">Hide 'Diagnostics'</button>
+</div>
+
+
+# Results
+<button onclick="show_hide('Results')">Show/Hide</button>
+<div id="Results"> 
+
+In this Section, we give the estimate of proportion of introductions from the 
+posterior sample.
+
+### For one dataset
+We first compute the posterior distribution of the proportion of introductions.
+```{r ,warning=FALSE,message=FALSE,echo=FALSE, eval=TRUE}
+posterior_sample_cpp$trace$N_tilde <- apply(posterior_sample_cpp$trace$c_tilde[,1,],1,sum)
+
+PIs <- posterior_sample_cpp$trace$K_tilde[,1] / posterior_sample_cpp$trace$N_tilde
+plot(PIs,type="l",ylab="Proportion of introductions",xlab="Iteration")
+```
+
+Second, the estimate is: 
+```{r ,warning=FALSE,message=FALSE,echo=TRUE, eval=TRUE}
+PI_estimate <- mean(PIs[-(1:param$burnin)])
+CI_PI <- quantile(PIs,c(0.025,0.975))
+
+cat("Estimate: ", round(PI_estimate,3), " (",round(CI_PI[1],3),"-",
+    round(CI_PI[2],3),")",sep="")
+```
+
+### For several bootstrap datasets
+We first compute the posterior distribution of the proportion of introductions.
+```{r ,warning=FALSE,message=FALSE,echo=FALSE, eval=TRUE}
+posterior_sample_bs_cpp$trace$N_tilde <- apply(posterior_sample_bs_cpp$trace$c_tilde[,1,],1,sum)
+
+PIs <- posterior_sample_bs_cpp$trace$K_tilde[,1] / posterior_sample_bs_cpp$trace$N_tilde
+plot(PIs,type="l",ylab="Proportion of introductions",xlab="Iteration")
+```
+
+Second, the estimate is: 
+```{r ,warning=FALSE,message=FALSE,echo=TRUE, eval=TRUE}
+PI_estimate <- mean(PIs[-(1:param$burnin)])
+CI_PI <- quantile(PIs,c(0.025,0.975))
+
+cat("Estimate: ", round(PI_estimate,3), " (",round(CI_PI[1],3),"-",
+    round(CI_PI[2],3),")",sep="")
+```
+
+<button onclick="hide('Results')">Hide 'Results'</button>
+</div>
+
+
