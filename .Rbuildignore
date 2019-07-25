@@ -1,4 +1,7 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
+<<<<<<< HEAD
 ^doc$
 ^Meta$
+=======
+>>>>>>> a75b5c3ab9b4bf5a085e851681e49f31ef542847
