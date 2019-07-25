@@ -1,0 +1,662 @@
+---
+title: "Subtrees and model fitting"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{dsf}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+ 
+```{r setup, include=FALSE}
+options(width = 100)
+knitr::opts_chunk$set(echo = TRUE, dev = c('png','pdf'), fig.width= 6, 
+                      fig.height=4,
+                      collapse = TRUE,
+                      comment = "#>"
+)
+```
+<script>
+ function show_hide(ID) {
+  var x = document.getElementById(ID);
+  if (x.style.display === "none") {
+   x.style.display = "block";
+  } else {
+   x.style.display = "none";
+  }
+ }
+function hide(ID) {
+ var x = document.getElementById(ID);
+ x.style.display = "none";
+}
+</script>
+ 
+```{r, echo=FALSE}
+# Remove all the object from memory.
+rm(list=ls())
+
+# Define paths
+path_Data <- "../inst/extdata/"
+```
+
+```{r libs ,warning=FALSE,message=FALSE,echo=FALSE}
+# Packages
+library(coda)
+library(ggplot2)
+library(phyloCRP)
+library(Rcpp)
+library(RcppArmadillo)
+
+if(!exists("MH_cpp")){
+ # Source functions
+ sourceCpp(file.path("..","inst","crp.cpp"))
+}
+```
+
+# Introduction
+<button onclick="show_hide('Introduction')">Show/Hide</button>
+<div id="Introduction"> 
+
+In this document, I present scripts and functions to use for applying the 
+proposed approach (by Oliver and I) to fit the subtrees data.
+
+The data are counts or sizes of different subtrees and the main assumption in our 
+framework is: "All the cases are not observed". In other words, we could have 
+
+* a subtree size which lower than the true subtree size, and 
+* an empty subtree which is an existing (but non-observed) subtree.
+
+In the following, the observed subtrees are named incomplete subtrees (denoted by $c$), and the
+true subtrees are named complete subtrees (denoted by $\tilde c$).
+The approach consists in modelling the incomplete subtrees via a Binomial model, 
+with a sampling proportion $p$, which is a model parameter.
+In other words, each incomplete subtree size is sampled from the associated
+complete subtree size.
+Prior distributions are defined for $p$ and $\tilde c$.
+The prior distribution of $p$ is a Beta distribution.
+The prior distribution of $\tilde c$ is a Chinese Restaurant process which 
+involves other parameters: $\alpha$ and $\tilde n$. 
+Prior distributions are defined for these two parameters.
+The hyperparameters of the prior distributions are fixed via an empirical Bayes 
+approach and/or from prior information. 
+
+Below, I firstly show how to simulate synthetic data and to set up a data object 
+for the fitting function.
+Then, I give the command for running the posterior sampler.
+Next, I present some diagnostics for checking the good properties of the Markov 
+chain. 
+I also provide commands to derive estimates and a quick simulation study is 
+proposed in order to assess the robustness of the method.
+
+Remark: For this document, it is not required to use HPC since the size of the 
+synthetic dataset is quite small. 
+Nevertheless, one could want to run the method on HPC for real-world data or for 
+running it on bigger dataset for a simulation study.
+
+### Outline
+Below, the sections address: 
+
+1. Preprocessing:
+    * Simulate a data set 
+    * Define `data` object
+    * Estimate some hyperparameters 
+    * Different options 
+2. Fitting:
+    * Get a prior sample 
+    * Get a posterior sample 
+    * The output object
+    * Trace plots
+3. Diagnostics: 
+    * Coda tests for stationarity
+    * Estimation errors
+    * Credible intervals
+    * Posterior predictive distribution
+    * Effective Sample Size
+    * Density
+4. A simulation study:
+    * Estimates
+    * Proportion of introductions
+
+<button onclick="hide('Introduction')">Hide 'Introduction'</button>
+</div>
+ 
+# Preprocess 
+<button onclick="show_hide('Preprocess')">Show/Hide</button>
+<div id="Preprocess"> 
+
+### Simulate a dataset 
+We first need to fix some quantities.
+
+* `N_tilde`: the true number of cases. Larger this parameter is, longer the computation 
+time. In the following, I choose to define `N_tilde = 50` so this Rmd script is not so
+much longer to compute. 
+* `p_truth`: the true sampling proportion (of observed cases). This parameter should
+impact the estimation error. We could expect that lower this sampling proportion is, 
+larger could be the error. In order to assess the validity of the proposed approach, I 
+choose to define `p_truth <- 0.7`.
+* `alpha_truth`: the true value of a model parameter (required to generate subtrees).
+
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+N_tilde <- 50
+p_truth <- 0.7
+alpha_truth <- alpha <- 10
+```
+
+The simulation of the observed is a two-step procedure which is in accordance 
+with the model and prior specifications of our proposed method. 
+So, we firstly simulate the true subtree sizes `c_tilde` and we derive the observed 
+subtree sizes `c` by subsampling according to the true sampling proportion. 
+
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+# Simulate the true subtree sizes 
+c_tilde <- rev(sort(rcrp_size_cpp(alpha,N_tilde)))
+cat("c_tilde =",c_tilde," \n")
+
+# Simulate the observed subtree sizes
+c <- subcrp_size_cpp(c_tilde,p_truth)
+c <- rev(sort(c[c!=0]))
+cat("c =",c )
+```
+
+For what follows, we define the `data` object. It must be a list containing the 
+observed subtree sizes, the number of observed cases and the number of 
+observed subtrees.
+
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+data <- list(
+ c = c, 
+ N = sum(c), 
+ K = length(c)
+)
+```
+
+Moreover, we need to save the true parameter values: `alpha`, `p`, `K_tilde` the number of
+true subtrees, `c_tilde` and `r` the number of non-observed cases. 
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+truth <- list(
+ alpha   = alpha_truth, 
+ p       = p_truth, 
+ K_tilde = length(c_tilde),
+ c_tilde = c_tilde,
+ # t = rep(1:length(c_tilde),times=c_tilde),
+ r       = N_tilde - data$N 
+)
+```
+
+### Hyperparameters 
+Now, we shall define the `hyperparameter` object. 
+Some hyperparameters depends on prior information, and in the
+following we fix the prior information so that is consistent with the 
+true values. 
+We consider that we have a prior information about the 
+proportion sampling, `p0`.
+From `p0` and the data, we can deduce a prior value for `r`, 
+that we denote by `r0`.
+Then, we can derive from these prior values and the data, 
+a prior value for some hyperparameters: `eta1`, `eta2`, `pi` 
+and `kappa`.
+
+Some other hyperparameters should be empirically estimated.
+For instance, the prior hyperparameters `lambda1` and `lambda2` are fixed so 
+that the prior mean (resp. variance) of `alpha` is $\hat \alpha$ (resp. 
+$\hat \alpha$), which is the maximum likelihood estimate of $\alpha$. 
+We choose this value since a vague prior on $\alpha$ leads to weak results.
+Then, we inform the prior with the likely mean value and we specify a large
+variance (same scale as the mean) so that the posterior distribution of `alpha`
+is not forced to be around the prior mean.
+
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+### Empirical Bayes ----
+alpha_hat <- alpha_estimator(data$c,alpha_lim=c(1,50))$alpha_hat
+alpha_hat
+
+### Prior information ----
+p0 <- p_truth
+r0 <- data$N*(1-p0)/p0
+
+### Hyperparam ----
+hyperparam <- list(
+ lambda1  = alpha_hat^2,
+ lambda2  = alpha_hat,
+ eta1 = data$N+1,
+ eta2 = data$N*(1-p0)/p0+1,
+ pi    = 1-p0,         
+ kappa = data$N
+)
+```
+
+We now specify some options for the posterior sampler: 
+
+* `burnin`: To ignore the first iterations for which we claim that the sampler has 
+supposedly not converged. 
+* `thin`: To keep only 1 iterations every `thin` iterations to lower the chain
+autocorrelation.
+* `temperature`: The temperature values of each parallel chains. The length of
+`temperature` determines the number of chains to compute. Each temperature should 
+belong to $(0,1]$ and one of them must be equalt ot one.  
+* `lambda `: The value is related to $n_\text{swap}$, the number of chains swap 
+at each iterations. For each iteration, $n_\text{swap} \sim 
+\operatorname{Pois}(\lambda)$.  
+* `n_iter`: The length of the output (posterior sample) adjusted to `burnin` and 
+`thin`.
+
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+### Options ----
+param <- list(n_iter = 1e4)
+```
+
+<button onclick="hide('Preprocess')">Hide 'Preprocess'</button>
+</div>
+ 
+# Application 
+<button onclick="show_hide('Application')">Show/Hide</button>
+<div id="Application"> 
+
+In this Section, we firstly show how to obtain a prior sample, by using a 
+Metropolis Algorithm. 
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+param_prior <- param
+param_prior$target <- "prior"
+
+prior_sample <- MH_cpp(param_prior,data,hyperparam,TRUE)
+```
+
+Concerning the posterior distribution, we need to use another algorithm.
+With the following command, we run the Parallel Tempering algorithm to sample 
+from the target distribution $\pi$.
+The Parallel Tempering algorithm compute few Markov chains with different 
+target distributions $\pi_i$ for $i=1, \dots, T$, which are all related to $\pi$ 
+and one of them must be $\pi$. 
+The main idea is to propose swap moves between chains, according to a correct 
+acceptance probability in order to preserve the invariant distribution of each 
+chain. 
+The swap moves allow the chains to escape from local traps and lead to a
+Markov chain with a low autocorrelation.
+Finally, we only keep the Markov chain for which the target distribution is $\pi$.
+
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+### Posterior sampler ----
+param$temperatures <- c(1,0.8,0.6,0.4)
+posterior_sample <- PT_cpp(param,data,hyperparam,TRUE)
+```
+
+In the remainder of this Section, we describe the `prior_sample` and 
+`posterior_sample` objects and we show how to obtain some results and some plots.
+
+About the prior, the `prior_sample` object is a list for which items are: 
+
+1) a sample for each model parameters and 
+2) information about the sampler algorithm (the acceptance probability and the
+acceptance rate).
+
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+### The object structure ----
+str(prior_sample)
+
+### Traces ----
+par(mfrow=c(2,2))
+plot(prior_sample$alpha,type="l",main="alpha",xlab="",ylab="")
+plot(prior_sample$p,type="l",main="p",xlab="",ylab="")
+plot(prior_sample$K_tilde,type="l",main="K_tilde",xlab="",ylab="")
+matplot(prior_sample$c_tilde,type="l",main="c_tilde",xlab="",ylab="")
+```
+
+About the posterior, the `posterior_sample`  object is a list with more items: 
+
+1) the first item, `trace`, contains lists, as the `prior_sample` object, which 
+are contains information about all the computed Markov chains, and
+2) an item, `comput_time`, which is the computation time of the Parallele 
+Tempering algorithm.
+
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+### The object structure ----
+str(posterior_sample)
+
+### Traces ----
+par(mfrow=c(2,2))
+plot(posterior_sample$trace$alpha[,1],type="l",main="alpha",xlab="",ylab="")
+plot(posterior_sample$trace$p[,1],type="l",main="p",xlab="",ylab="")
+plot(posterior_sample$trace$K_tilde[,1],type="l",main="K_tilde",xlab="",ylab="")
+matplot(posterior_sample$trace$c_tilde[,1,],type="l",main="c_tilde",xlab="",ylab="")
+```
+
+<button onclick="hide('Application')">Hide 'Application'</button>
+</div>
+ 
+# Mixing and posterior checkings
+<button onclick="show_hide('checkings')">Show/Hide</button>
+<div id="checkings"> 
+
+In the previous Section, we show some trace plots which could be used as first 
+checks to assess the convergence of the Markov chain. 
+In the following, we give more information about the chains:
+
+1) we run some tests from the `coda` package, 
+2) we show how to compute the estimation error, 
+3) we check that the true parameter is in the credible interval and
+4) we study the posterior predictive distribution.
+
+As additional information, we also give the Effective Sample Size (ESS) and 
+the (log)-densities of the sample. (Just notice that the normalization constant
+could be efficiently estimated by considering all the samples, even those with a
+temperature different to 1, see 
+[Buchholz et al. (2018)](https://arxiv.org/pdf/1808.07730.pdf))
+
+### Coda tests 
+<button onclick="show_hide('tests')">Show/Hide</button>
+<div id="tests"> 
+
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+threshold <- 0.01
+```
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+mcmc_alpha <- as.mcmc(posterior_sample$trace$alpha[,1])
+
+geweke_z_alpha    <- geweke.diag(mcmc_alpha)
+geweke_z_alpha    <- 1-pnorm(abs(geweke_z_alpha$z),0,1)
+```
+
+```{r ,warning=FALSE,message=FALSE,echo=FALSE}
+if(geweke_z_alpha > threshold) 
+ cat("The p-value of the Geweke test is :", geweke_z_alpha, ".",
+     "Then the null hypothesis is not rejected: the means of the first part and the last part",
+     "of the Markov chain are not significatively different, which could be an",
+     "evidence in support of the convergence of the chain. ") else
+ cat("The p-value of the Geweke test is :", geweke_z_alpha, ".",
+     "Then the null hypothesis is rejected: the means of the first part and the last part",
+     "of the Markov chain are significatively different, which could be an",
+     "evidence in support of the divergence of the chain. ")
+```
+The reader should be aware that using a hypothesis test is controversial.
+As least, this test should be computed several times on independent posterior 
+samples to check how many frequently the null hypothesis is rejected or not, 
+or to check if the p-values seem to be uniform between 0 and 1 (which should 
+be the case if assuming the null hypothesis) (a $\chi^2$-test could be used 
+to this end, but this is "the snake that bites its tail").
+
+
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+heildel_sta_alpha <- heidel.diag(mcmc_alpha)[3]
+```
+```{r ,warning=FALSE,message=FALSE,echo=FALSE}
+if(heildel_sta_alpha > threshold) 
+ cat("The p-value of the Heidelberger and Welch's test is :", heildel_sta_alpha, ".",
+     "Then the null hypothesis is not rejected: the sample values come from a", 
+     "stationary distribution. ") else
+ cat("The p-value of the Heidelberger and Welch's test is :", heildel_sta_alpha, ".",
+     "Then the null hypothesis is rejected: the sample values do not come from a", 
+     "stationary distribution. ")
+```
+
+<button onclick="hide('tests')">Hide 'Coda tests'</button>
+</div>
+
+
+### Error
+<button onclick="show_hide('Error')">Show/Hide</button>
+<div id="Error"> 
+
+In this Section, we compute the (Euclidean) distances between the estimates and 
+the true values, for each model parameter.
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+summaries <- compute_summaries(posterior_sample$trace,truth)
+```
+
+```{r ,warning=FALSE,message=FALSE,echo=FALSE}
+cat("The difference between the true alpha and the estimate is: ",summaries["alpha_error"])
+```
+```{r ,warning=FALSE,message=FALSE,echo=FALSE}
+cat("The difference between the true p and the estimate is: ",summaries["p_error"])
+```
+```{r ,warning=FALSE,message=FALSE,echo=FALSE}
+cat("The difference between the true r and the estimate is: ",summaries["r_error"])
+```
+```{r ,warning=FALSE,message=FALSE,echo=FALSE}
+cat("The difference between the true K_tilde and the estimate is: ",summaries["K_error"])
+```
+ 
+<button onclick="hide('Error')">Hide 'Error'</button>
+</div>
+
+### Credible interval
+<button onclick="show_hide('CI')">Show/Hide</button>
+<div id="CI"> 
+
+In this Section, we check if the true value of the model parameters belong to 
+the credible interval. 
+
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+CIs <- compute_CI(posterior_sample$trace)
+
+summaries2 <- CI_covering(posterior_sample$trace,truth)
+summaries2$c_tilde <- as.logical(prod(summaries2$c_tilde))
+```
+
+```{r ,warning=FALSE,message=FALSE,echo=FALSE}
+if(summaries2$alpha)
+ cat("The true value of alpha (",truth$alpha,") is in the credible interval: ",
+     "[",CIs$alpha[1],",",CIs$alpha[2],"]") else 
+  cat("The true value of alpha (",truth$alpha,") is not in the credible interval: ",
+      "[",CIs$alpha[1],",",CIs$alpha[2],"]")
+```
+```{r ,warning=FALSE,message=FALSE,echo=FALSE}
+if(summaries2$p)
+ cat("The true value of p (",truth$p,") is in the credible interval: ",
+     "[",CIs$p[1],",",CIs$p[2],"]") else 
+  cat("The true value of p (",truth$p,") is not in the credible interval: ",
+      "[",CIs$p[1],",",CIs$p[2],"]")
+```
+```{r ,warning=FALSE,message=FALSE,echo=FALSE}
+if(summaries2$r)
+ cat("The true value of r (",truth$r,") is in the credible interval: ",
+     "[",CIs$r[1],",",CIs$r[2],"]") else 
+  cat("The true value of r (",truth$r,") is not in the credible interval: ",
+      "[",CIs$r[1],",",CIs$r[2],"]")
+```
+```{r ,warning=FALSE,message=FALSE,echo=FALSE}
+if(summaries2$K)
+ cat("The true value of K (",truth$K,") is in the credible interval: ",
+     "[",CIs$K[1],",",CIs$K[2],"]") else 
+  cat("The true value of K (",truth$K,") is not in the credible interval: ",
+      "[",CIs$K[1],",",CIs$K[2],"]")
+```
+
+For the parameter `c_tilde` it is better the plot the credible interval.
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+xlim <- c(1, 
+          max(ncol(CIs$c_tilde),length(truth$c_tilde)))
+ylim <- c(0,
+          max(CIs$c_tilde[,1],truth$c_tilde[1]))
+
+matplot(t(CIs$c_tilde),type="o",lty=2,pch=16,col="gray",xlim=xlim,ylim=ylim)
+lines(truth$c_tilde,type="o")
+```
+```{r ,warning=FALSE,message=FALSE,echo=FALSE}
+if(summaries2$c_tilde)
+ cat("In this case, we see that the true subtree sizes are in the credible interval.") else 
+  cat("In this case, we see that the true subtree sizes are not in the credible interval,",
+      " since at least one true subtree size is not in the marginal credible interval.")
+```
+Again, the computations in this section should be repeat several times to assess
+the validity of the method.
+
+<button onclick="hide('CI')">Hide 'Credible interval'</button>
+</div>
+
+
+### Posterior predictive distribution
+<button onclick="show_hide('predictive')">Show/Hide</button>
+<div id="predictive"> 
+
+In this Section, we investigate if the observed subtree sizes are in the 
+credible interval of the posterior predictive distribution.
+First, we check for all the iterations of the posterior sampler: at each iteration
+the credible interval is computed.
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+### CI posterior predictive ----
+burnin <- 10
+q1 <- 0.025 ; q2 <- 1-q1
+in_CI <- NULL
+for(k in (burnin+2):length(posterior_sample$trace$alpha[,1])){
+ c_tmp <- posterior_sample$trace$c_tilde[k,1,]
+ c_tmp <- c_tmp[c_tmp != 0]
+ 
+ p_tmp <- posterior_sample$trace$p[k,1]
+ 
+ c_data_tmp <- data$c
+ c_data_tmp <- c(c_data_tmp,rep(0,length(c_tmp)-length(c_data_tmp)))
+ 
+ in_CI_tmp <- TRUE
+ for(j in 1:length(c_tmp)){
+  in_CI_tmp <- in_CI_tmp & (phyloCRP:::"%between%"(c_data_tmp[j], 
+                                                   qbinom(p_tmp,c_tmp[j],prob=c(q1,q2))) )
+ }
+ in_CI <- c(in_CI,in_CI_tmp)
+}
+```
+
+```{r ,warning=FALSE,message=FALSE,echo=FALSE}
+cat("For all the iterations, the observed subtree sizes are: \n",
+    sum(in_CI), "times in the credible interval of the posterior predictive distribution, and \n ",
+    sum(1-in_CI), "times outside the credible interval of the posterior predictive distribution.")
+```
+
+
+Second, we compute the credible interval with the estimate of `p` and `c_tilde`.
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+### CI posterior predictive ----
+q1 <- 0.025 ; q2 <- 1-q1
+
+indexes <- which(names(summaries) == "c_tilde_mean")
+c_tmp <- round(summaries[indexes],0)
+
+p_tmp <- summaries["p_mean"]
+
+c_data_tmp <- data$c
+if(length(c_tmp)-length(c_data_tmp) > 0)
+ c_data_tmp <- c(c_data_tmp,rep(0,length(c_tmp)-length(c_data_tmp)))
+
+in_CI_tmp <- TRUE
+CI_values <- NULL
+for(j in 1:length(c_tmp)){
+ CI_values <- cbind(CI_values,
+                    qbinom(p_tmp,c_tmp[j],prob=c(q1,q2)))
+ in_CI_tmp <- in_CI_tmp & (phyloCRP:::"%between%"(c_data_tmp[j], 
+                                                   qbinom(p_tmp,c_tmp[j],prob=c(q1,q2))))
+}
+
+```
+
+```{r ,warning=FALSE,message=FALSE,echo=FALSE}
+if(in_CI_tmp)
+ cat("With the estimate of p and c_tilde, the observed subtree sizes are ",
+    "in the credible interval of the posterior predictive distribution.") else
+ cat("With the estimate of p and c_tilde, the observed subtree sizes are not ",
+    "in the credible interval of the posterior predictive distribution.") 
+```
+
+<button onclick="hide('predictive')">Hide 'Posterior predictive distribution'</button>
+</div>
+
+
+### Effective Sample Size
+<button onclick="show_hide('ESS')">Show/Hide</button>
+<div id="ESS"> 
+
+Below, we give the ESS for `alpha`, `K_tilde`, `p` and `r` in order to have 
+an idea of the number of iterations that we should run to obtain accurate estimates.
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+ESS <- c(
+ effectiveSize(posterior_sample$trace$alpha[,1]),
+ effectiveSize(posterior_sample$trace$K_tilde[,1]),
+ effectiveSize(posterior_sample$trace$p[,1]),
+ effectiveSize(posterior_sample$trace$r[,1])
+)
+names(ESS) <- c("alpha","K_tilde","p","r")
+ESS
+```
+ 
+<button onclick="hide('ESS')">Hide 'Effective Sample Size'</button>
+</div>
+
+
+### Density
+<button onclick="show_hide('Density')">Show/Hide</button>
+<div id="Density"> 
+
+Below, we show how to compute the (log-)posterior densities of the sample.
+Furthermore, we plot the trace of the log-posterior density in order to assess
+(by eyes) the convergence of the Markov chain.
+
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+densities <- log_dtarget_sample_cpp_PT(posterior_sample$trace,data,hyperparam,1)
+truth_density <- log_dtarget(truth,data,hyperparam)
+
+head(densities)
+densities <- as.data.frame(densities)
+colnames(densities) <- c("log_posterior","posterior",
+                    "log_lkh","lkh",
+                    "log_prior","prior")
+
+plot(densities$log_posterior,type="l",main="log posterior density") ; abline(h=truth_density$log_posterior,col=2)
+```
+
+<button onclick="hide('Density')">Hide 'Density'</button>
+</div>
+
+<button onclick="hide('checkings')">Hide 'Mixing and posterior checkings'</button>
+</div>
+ 
+# Results
+<button onclick="show_hide('Results')">Show/Hide</button>
+<div id="Results"> 
+
+In this Section, we show (or show again) how to compute the estimates, the 
+credible intervals and the estimate of the quantity of interest: the 
+proportion of introduction.
+
+#### Estimates:
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+alpha_est <- mean(posterior_sample$trace$alpha[,1])
+p_est <- mean(posterior_sample$trace$p[,1])
+r_est <- median(posterior_sample$trace$r[,1])
+K_est <- median(posterior_sample$trace$K_tilde[,1])
+
+c_est <- NULL
+for(j in 1:ncol(posterior_sample$trace$c_tilde[,1,])){
+ c_est <- c(c_est,
+            median(posterior_sample$trace$c_tilde[,1,j]))
+}
+```
+```{r ,warning=FALSE,message=FALSE,echo=FALSE}
+cat("The estimate of alpha is:",alpha_est,"\n")
+cat("The estimate of p is:",p_est,"\n")
+cat("The estimate of r is:",r_est,"\n")
+cat("The estimate of K_tilde is:",K_est,"\n")
+cat("The estimate of c_tilde is:",c_est[c_est!=0],"\n")
+```
+
+#### Credible intervals: 
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+CIs <- compute_CI(posterior_sample$trace)
+```
+
+#### Estimated proportion of introductions: 
+In this framework, the proportion of introductions is the number of cases 
+divided by the number of subtrees.
+```{r ,warning=FALSE,message=FALSE,echo=TRUE}
+posterior_sample$trace$N_tilde <- apply(posterior_sample$trace$c_tilde[,1,],1,sum)
+PIs <- posterior_sample$trace$K[,1] / posterior_sample$trace$N_tilde
+
+PI_estimate <- mean(PIs)
+PI_CI <- quantile(sort(PIs),c(0.025,0.975))
+
+plot(PIs,type="l",ylab="Importance rate",xlab="Iteration")
+```
+```{r ,warning=FALSE,message=FALSE,echo=FALSE}
+cat("The estimate of the proportion of introductions is ",PI_estimate,
+    " (",PI_CI[1],"-",PI_CI[2],").")
+```
+
+<button onclick="hide('Results')">Hide 'Results'</button>
+</div>
+

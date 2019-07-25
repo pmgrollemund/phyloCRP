@@ -1,0 +1,47 @@
+
+
+WARNING: RAxML is not checking sequences for duplicate seqs and sites with missing data!
+
+
+
+This is RAxML version 8.2.12 released by Alexandros Stamatakis on May 2018.
+
+With greatly appreciated code contributions by:
+Andre Aberer      (HITS)
+Simon Berger      (HITS)
+Alexey Kozlov     (HITS)
+Kassian Kobert    (HITS)
+David Dao         (KIT and HITS)
+Sarah Lutteropp   (KIT and HITS)
+Nick Pattengale   (Sandia)
+Wayne Pfeiffer    (SDSC)
+Akifumi S. Tanabe (NRIFS)
+Charlie Taylor    (UF)
+
+
+RAxML Bipartition Computation: Drawing support values from trees in file newseq_LANL_Subtype_01_AE_mafft_aligned_ndrm.newick.bstrees onto tree in file /home/paul/Documents/Postdoc/HIV_transmission/Code/phyloHIV/inst/extdata/Tree/fasttree_newseq_LANL_Subtype_01_AE_mafft_aligned_ndrm//newseq_LANL_Subtype_01_AE_mafft_aligned_ndrm_ft.000.newick
+
+
+RAxML was called as follows:
+
+/home/paul/R/x86_64-pc-linux-gnu-library/3.5/big.phylo/ext/ExaML-raxml -m GTRCAT -p12345 -f b -t /home/paul/Documents/Postdoc/HIV_transmission/Code/phyloHIV/inst/extdata/Tree/fasttree_newseq_LANL_Subtype_01_AE_mafft_aligned_ndrm//newseq_LANL_Subtype_01_AE_mafft_aligned_ndrm_ft.000.newick -z newseq_LANL_Subtype_01_AE_mafft_aligned_ndrm.newick.bstrees -n newseq_LANL_Subtype_01_AE_mafft_aligned_ndrm.newick 
+
+
+
+
+Found 1 tree in File /home/paul/Documents/Postdoc/HIV_transmission/Code/phyloHIV/inst/extdata/Tree/fasttree_newseq_LANL_Subtype_01_AE_mafft_aligned_ndrm//newseq_LANL_Subtype_01_AE_mafft_aligned_ndrm_ft.000.newick
+
+
+
+Found 2 trees in File newseq_LANL_Subtype_01_AE_mafft_aligned_ndrm.newick.bstrees
+
+
+
+Found 1 tree in File /home/paul/Documents/Postdoc/HIV_transmission/Code/phyloHIV/inst/extdata/Tree/fasttree_newseq_LANL_Subtype_01_AE_mafft_aligned_ndrm//newseq_LANL_Subtype_01_AE_mafft_aligned_ndrm_ft.000.newick
+
+
+
+Time for Computation of Bipartitions 0.002350
+Tree with bipartitions written to file:  /home/paul/Documents/Postdoc/HIV_transmission/Code/phyloHIV/inst/extdata/Tree/fasttree_newseq_LANL_Subtype_01_AE_mafft_aligned_ndrm/RAxML_bipartitions.newseq_LANL_Subtype_01_AE_mafft_aligned_ndrm.newick
+Tree with bipartitions as branch labels written to file:  /home/paul/Documents/Postdoc/HIV_transmission/Code/phyloHIV/inst/extdata/Tree/fasttree_newseq_LANL_Subtype_01_AE_mafft_aligned_ndrm/RAxML_bipartitionsBranchLabels.newseq_LANL_Subtype_01_AE_mafft_aligned_ndrm.newick
+Execution information file written to :  /home/paul/Documents/Postdoc/HIV_transmission/Code/phyloHIV/inst/extdata/Tree/fasttree_newseq_LANL_Subtype_01_AE_mafft_aligned_ndrm/RAxML_info.newseq_LANL_Subtype_01_AE_mafft_aligned_ndrm.newick

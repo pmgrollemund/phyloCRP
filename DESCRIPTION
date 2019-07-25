@@ -1,0 +1,19 @@
+Package: phyloCRP
+Type: Package
+Title: A Bayesian nonparametric approach to fit phylogenetic subtrees 
+Version: 0.1.0
+Author: Paul-Marie Grollemund
+Maintainer: Paul-Marie Grollemund <paul.marie.grollemund@gmail.com>
+Description: No description for now.
+License: GPL-3
+Encoding: UTF-8
+LazyData: true
+Imports: stats, Rcpp, RcppArmadillo, ape, big.phylo, coda, data.table, ggplot2, memisc, stringr
+Depends: R (>= 2.10)
+RoxygenNote: 6.1.1
+NeedsCompilation: no
+Packaged: 2019-06-21 12:03:21 UTC; paul
+Suggests: 
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
