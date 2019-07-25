@@ -1,5 +1,0 @@
-The installation can fail due to a known problem with RcppArmadillo and Mac.
-The error message that I had is: "ld: library not found for -lgfortran".
-Please refer to the following website which provides a comprehensive solution:
-
-https://thecoatlessprofessor.com/programming/rcpp-rcpparmadillo-and-os-x-mavericks--lgfortran-and--lquadmath-error/
