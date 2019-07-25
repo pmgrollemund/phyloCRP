@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="pandoc" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+
+<title>Subtrees and model fitting</title>
+
+
+
+<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css" data-origin="pandoc">
+div.sourceCode { overflow-x: auto; }
+table.sourceCode, tr.sourceCode, td.lineNumbers, td.sourceCode {
+  margin: 0; padding: 0; vertical-align: baseline; border: none; }
+table.sourceCode { width: 100%; line-height: 100%; }
+td.lineNumbers { text-align: right; padding-right: 4px; padding-left: 4px; color: #aaaaaa; border-right: 1px solid #aaaaaa; }
+td.sourceCode { padding-left: 5px; }
+code > span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code > span.dt { color: #902000; } /* DataType */
+code > span.dv { color: #40a070; } /* DecVal */
+code > span.bn { color: #40a070; } /* BaseN */
+code > span.fl { color: #40a070; } /* Float */
+code > span.ch { color: #4070a0; } /* Char */
+code > span.st { color: #4070a0; } /* String */
+code > span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code > span.ot { color: #007020; } /* Other */
+code > span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code > span.fu { color: #06287e; } /* Function */
+code > span.er { color: #ff0000; font-weight: bold; } /* Error */
+code > span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+code > span.cn { color: #880000; } /* Constant */
+code > span.sc { color: #4070a0; } /* SpecialChar */
+code > span.vs { color: #4070a0; } /* VerbatimString */
+code > span.ss { color: #bb6688; } /* SpecialString */
+code > span.im { } /* Import */
+code > span.va { color: #19177c; } /* Variable */
+code > span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code > span.op { color: #666666; } /* Operator */
+code > span.bu { } /* BuiltIn */
+code > span.ex { } /* Extension */
+code > span.pp { color: #bc7a00; } /* Preprocessor */
+code > span.at { color: #7d9029; } /* Attribute */
+code > span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code > span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code > span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    for (var j = 0; j < rules.length; j++) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") continue;
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' || rule.style.backgroundColor === '') continue;
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+<link href="data:text/css;charset=utf-8,body%20%7B%0Abackground%2Dcolor%3A%20%23fff%3B%0Amargin%3A%201em%20auto%3B%0Amax%2Dwidth%3A%20700px%3B%0Aoverflow%3A%20visible%3B%0Apadding%2Dleft%3A%202em%3B%0Apadding%2Dright%3A%202em%3B%0Afont%2Dfamily%3A%20%22Open%20Sans%22%2C%20%22Helvetica%20Neue%22%2C%20Helvetica%2C%20Arial%2C%20sans%2Dserif%3B%0Afont%2Dsize%3A%2014px%3B%0Aline%2Dheight%3A%201%2E35%3B%0A%7D%0A%23header%20%7B%0Atext%2Dalign%3A%20center%3B%0A%7D%0A%23TOC%20%7B%0Aclear%3A%20both%3B%0Amargin%3A%200%200%2010px%2010px%3B%0Apadding%3A%204px%3B%0Awidth%3A%20400px%3B%0Aborder%3A%201px%20solid%20%23CCCCCC%3B%0Aborder%2Dradius%3A%205px%3B%0Abackground%2Dcolor%3A%20%23f6f6f6%3B%0Afont%2Dsize%3A%2013px%3B%0Aline%2Dheight%3A%201%2E3%3B%0A%7D%0A%23TOC%20%2Etoctitle%20%7B%0Afont%2Dweight%3A%20bold%3B%0Afont%2Dsize%3A%2015px%3B%0Amargin%2Dleft%3A%205px%3B%0A%7D%0A%23TOC%20ul%20%7B%0Apadding%2Dleft%3A%2040px%3B%0Amargin%2Dleft%3A%20%2D1%2E5em%3B%0Amargin%2Dtop%3A%205px%3B%0Amargin%2Dbottom%3A%205px%3B%0A%7D%0A%23TOC%20ul%20ul%20%7B%0Amargin%2Dleft%3A%20%2D2em%3B%0A%7D%0A%23TOC%20li%20%7B%0Aline%2Dheight%3A%2016px%3B%0A%7D%0Atable%20%7B%0Amargin%3A%201em%20auto%3B%0Aborder%2Dwidth%3A%201px%3B%0Aborder%2Dcolor%3A%20%23DDDDDD%3B%0Aborder%2Dstyle%3A%20outset%3B%0Aborder%2Dcollapse%3A%20collapse%3B%0A%7D%0Atable%20th%20%7B%0Aborder%2Dwidth%3A%202px%3B%0Apadding%3A%205px%3B%0Aborder%2Dstyle%3A%20inset%3B%0A%7D%0Atable%20td%20%7B%0Aborder%2Dwidth%3A%201px%3B%0Aborder%2Dstyle%3A%20inset%3B%0Aline%2Dheight%3A%2018px%3B%0Apadding%3A%205px%205px%3B%0A%7D%0Atable%2C%20table%20th%2C%20table%20td%20%7B%0Aborder%2Dleft%2Dstyle%3A%20none%3B%0Aborder%2Dright%2Dstyle%3A%20none%3B%0A%7D%0Atable%20thead%2C%20table%20tr%2Eeven%20%7B%0Abackground%2Dcolor%3A%20%23f7f7f7%3B%0A%7D%0Ap%20%7B%0Amargin%3A%200%2E5em%200%3B%0A%7D%0Ablockquote%20%7B%0Abackground%2Dcolor%3A%20%23f6f6f6%3B%0Apadding%3A%200%2E25em%200%2E75em%3B%0A%7D%0Ahr%20%7B%0Aborder%2Dstyle%3A%20solid%3B%0Aborder%3A%20none%3B%0Aborder%2Dtop%3A%201px%20solid%20%23777%3B%0Amargin%3A%2028px%200%3B%0A%7D%0Adl%20%7B%0Amargin%2Dleft%3A%200%3B%0A%7D%0Adl%20dd%20%7B%0Amargin%2Dbottom%3A%2013px%3B%0Amargin%2Dleft%3A%2013px%3B%0A%7D%0Adl%20dt%20%7B%0Afont%2Dweight%3A%20bold%3B%0A%7D%0Aul%20%7B%0Amargin%2Dtop%3A%200%3B%0A%7D%0Aul%20li%20%7B%0Alist%2Dstyle%3A%20circle%20outside%3B%0A%7D%0Aul%20ul%20%7B%0Amargin%2Dbottom%3A%200%3B%0A%7D%0Apre%2C%20code%20%7B%0Abackground%2Dcolor%3A%20%23f7f7f7%3B%0Aborder%2Dradius%3A%203px%3B%0Acolor%3A%20%23333%3B%0Awhite%2Dspace%3A%20pre%2Dwrap%3B%20%0A%7D%0Apre%20%7B%0Aborder%2Dradius%3A%203px%3B%0Amargin%3A%205px%200px%2010px%200px%3B%0Apadding%3A%2010px%3B%0A%7D%0Apre%3Anot%28%5Bclass%5D%29%20%7B%0Abackground%2Dcolor%3A%20%23f7f7f7%3B%0A%7D%0Acode%20%7B%0Afont%2Dfamily%3A%20Consolas%2C%20Monaco%2C%20%27Courier%20New%27%2C%20monospace%3B%0Afont%2Dsize%3A%2085%25%3B%0A%7D%0Ap%20%3E%20code%2C%20li%20%3E%20code%20%7B%0Apadding%3A%202px%200px%3B%0A%7D%0Adiv%2Efigure%20%7B%0Atext%2Dalign%3A%20center%3B%0A%7D%0Aimg%20%7B%0Abackground%2Dcolor%3A%20%23FFFFFF%3B%0Apadding%3A%202px%3B%0Aborder%3A%201px%20solid%20%23DDDDDD%3B%0Aborder%2Dradius%3A%203px%3B%0Aborder%3A%201px%20solid%20%23CCCCCC%3B%0Amargin%3A%200%205px%3B%0A%7D%0Ah1%20%7B%0Amargin%2Dtop%3A%200%3B%0Afont%2Dsize%3A%2035px%3B%0Aline%2Dheight%3A%2040px%3B%0A%7D%0Ah2%20%7B%0Aborder%2Dbottom%3A%204px%20solid%20%23f7f7f7%3B%0Apadding%2Dtop%3A%2010px%3B%0Apadding%2Dbottom%3A%202px%3B%0Afont%2Dsize%3A%20145%25%3B%0A%7D%0Ah3%20%7B%0Aborder%2Dbottom%3A%202px%20solid%20%23f7f7f7%3B%0Apadding%2Dtop%3A%2010px%3B%0Afont%2Dsize%3A%20120%25%3B%0A%7D%0Ah4%20%7B%0Aborder%2Dbottom%3A%201px%20solid%20%23f7f7f7%3B%0Amargin%2Dleft%3A%208px%3B%0Afont%2Dsize%3A%20105%25%3B%0A%7D%0Ah5%2C%20h6%20%7B%0Aborder%2Dbottom%3A%201px%20solid%20%23ccc%3B%0Afont%2Dsize%3A%20105%25%3B%0A%7D%0Aa%20%7B%0Acolor%3A%20%230033dd%3B%0Atext%2Ddecoration%3A%20none%3B%0A%7D%0Aa%3Ahover%20%7B%0Acolor%3A%20%236666ff%3B%20%7D%0Aa%3Avisited%20%7B%0Acolor%3A%20%23800080%3B%20%7D%0Aa%3Avisited%3Ahover%20%7B%0Acolor%3A%20%23BB00BB%3B%20%7D%0Aa%5Bhref%5E%3D%22http%3A%22%5D%20%7B%0Atext%2Ddecoration%3A%20underline%3B%20%7D%0Aa%5Bhref%5E%3D%22https%3A%22%5D%20%7B%0Atext%2Ddecoration%3A%20underline%3B%20%7D%0A%0Acode%20%3E%20span%2Ekw%20%7B%20color%3A%20%23555%3B%20font%2Dweight%3A%20bold%3B%20%7D%20%0Acode%20%3E%20span%2Edt%20%7B%20color%3A%20%23902000%3B%20%7D%20%0Acode%20%3E%20span%2Edv%20%7B%20color%3A%20%2340a070%3B%20%7D%20%0Acode%20%3E%20span%2Ebn%20%7B%20color%3A%20%23d14%3B%20%7D%20%0Acode%20%3E%20span%2Efl%20%7B%20color%3A%20%23d14%3B%20%7D%20%0Acode%20%3E%20span%2Ech%20%7B%20color%3A%20%23d14%3B%20%7D%20%0Acode%20%3E%20span%2Est%20%7B%20color%3A%20%23d14%3B%20%7D%20%0Acode%20%3E%20span%2Eco%20%7B%20color%3A%20%23888888%3B%20font%2Dstyle%3A%20italic%3B%20%7D%20%0Acode%20%3E%20span%2Eot%20%7B%20color%3A%20%23007020%3B%20%7D%20%0Acode%20%3E%20span%2Eal%20%7B%20color%3A%20%23ff0000%3B%20font%2Dweight%3A%20bold%3B%20%7D%20%0Acode%20%3E%20span%2Efu%20%7B%20color%3A%20%23900%3B%20font%2Dweight%3A%20bold%3B%20%7D%20%20code%20%3E%20span%2Eer%20%7B%20color%3A%20%23a61717%3B%20background%2Dcolor%3A%20%23e3d2d2%3B%20%7D%20%0A" rel="stylesheet" type="text/css" />
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Subtrees and model fitting</h1>
+
+
+
+<script>
+ function show_hide(ID) {
+  var x = document.getElementById(ID);
+  if (x.style.display === "none") {
+   x.style.display = "block";
+  } else {
+   x.style.display = "none";
+  }
+ }
+function hide(ID) {
+ var x = document.getElementById(ID);
+ x.style.display = "none";
+}
+</script>
+<div id="introduction" class="section level1">
+<h1>Introduction</h1>
+<button onclick="show_hide('Introduction')">
+Show/Hide
+</button>
+<div id="Introduction">
+<p>In this document, I present scripts and functions to use for applying the proposed approach (by Oliver and I) to fit the subtrees data.</p>
+<p>The data are counts or sizes of different subtrees and the main assumption in our framework is: “All the cases are not observed”. In other words, we could have</p>
+<ul>
+<li>a subtree size which lower than the true subtree size, and</li>
+<li>an empty subtree which is an existing (but non-observed) subtree.</li>
+</ul>
+<p>In the following, the observed subtrees are named incomplete subtrees (denoted by <span class="math inline">\(c\)</span>), and the true subtrees are named complete subtrees (denoted by <span class="math inline">\(\tilde c\)</span>). The approach consists in modelling the incomplete subtrees via a Binomial model, with a sampling proportion <span class="math inline">\(p\)</span>, which is a model parameter. In other words, each incomplete subtree size is sampled from the associated complete subtree size. Prior distributions are defined for <span class="math inline">\(p\)</span> and <span class="math inline">\(\tilde c\)</span>. The prior distribution of <span class="math inline">\(p\)</span> is a Beta distribution. The prior distribution of <span class="math inline">\(\tilde c\)</span> is a Chinese Restaurant process which involves other parameters: <span class="math inline">\(\alpha\)</span> and <span class="math inline">\(\tilde n\)</span>. Prior distributions are defined for these two parameters. The hyperparameters of the prior distributions are fixed via an empirical Bayes approach and/or from prior information.</p>
+<p>Below, I firstly show how to simulate synthetic data and to set up a data object for the fitting function. Then, I give the command for running the posterior sampler. Next, I present some diagnostics for checking the good properties of the Markov chain. I also provide commands to derive estimates and a quick simulation study is proposed in order to assess the robustness of the method.</p>
+<p>Remark: For this document, it is not required to use HPC since the size of the synthetic dataset is quite small. Nevertheless, one could want to run the method on HPC for real-world data or for running it on bigger dataset for a simulation study.</p>
+<h3 id="outline">Outline</h3>
+<p>Below, the sections address:</p>
+<ol style="list-style-type: decimal">
+<li>Preprocessing:
+<ul>
+<li>Simulate a data set</li>
+<li>Define <code>data</code> object</li>
+<li>Estimate some hyperparameters</li>
+<li>Different options</li>
+</ul></li>
+<li>Fitting:
+<ul>
+<li>Get a prior sample</li>
+<li>Get a posterior sample</li>
+<li>The output object</li>
+<li>Trace plots</li>
+</ul></li>
+<li>Diagnostics:
+<ul>
+<li>Coda tests for stationarity</li>
+<li>Estimation errors</li>
+<li>Credible intervals</li>
+<li>Posterior predictive distribution</li>
+<li>Effective Sample Size</li>
+<li>Density</li>
+</ul></li>
+<li>A simulation study:
+<ul>
+<li>Estimates</li>
+<li>Proportion of introductions</li>
+</ul></li>
+</ol>
+<button onclick="hide('Introduction')">
+Hide ‘Introduction’
+</button>
+</div>
+</div>
+<div id="preprocess" class="section level1">
+<h1>Preprocess</h1>
+<button onclick="show_hide('Preprocess')">
+Show/Hide
+</button>
+<div id="Preprocess">
+<h3 id="simulate-a-dataset">Simulate a dataset</h3>
+<p>We first need to fix some quantities.</p>
+<ul>
+<li><code>N_tilde</code>: the true number of cases. Larger this parameter is, longer the computation time. In the following, I choose to define <code>N_tilde = 50</code> so this Rmd script is not so much longer to compute.</li>
+<li><code>p_truth</code>: the true sampling proportion (of observed cases). This parameter should impact the estimation error. We could expect that lower this sampling proportion is, larger could be the error. In order to assess the validity of the proposed approach, I choose to define <code>p_truth &lt;- 0.7</code>.</li>
+<li><code>alpha_truth</code>: the true value of a model parameter (required to generate subtrees).</li>
+</ul>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">N_tilde &lt;-<span class="st"> </span><span class="dv">50</span>
+p_truth &lt;-<span class="st"> </span><span class="fl">0.7</span>
+alpha_truth &lt;-<span class="st"> </span>alpha &lt;-<span class="st"> </span><span class="dv">10</span></code></pre></div>
+<p>The simulation of the observed is a two-step procedure which is in accordance with the model and prior specifications of our proposed method. So, we firstly simulate the true subtree sizes <code>c_tilde</code> and we derive the observed subtree sizes <code>c</code> by subsampling according to the true sampling proportion.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co"># Simulate the true subtree sizes </span>
+c_tilde &lt;-<span class="st"> </span><span class="kw">rev</span>(<span class="kw">sort</span>(<span class="kw">rcrp_size_cpp</span>(alpha,N_tilde)))
+<span class="kw">cat</span>(<span class="st">&quot;c_tilde =&quot;</span>,c_tilde,<span class="st">&quot; </span><span class="ch">\n</span><span class="st">&quot;</span>)
+<span class="co">#&gt; c_tilde = 15 7 3 3 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1</span>
+
+<span class="co"># Simulate the observed subtree sizes</span>
+c &lt;-<span class="st"> </span><span class="kw">subcrp_size_cpp</span>(c_tilde,p_truth)
+c &lt;-<span class="st"> </span><span class="kw">rev</span>(<span class="kw">sort</span>(c[c<span class="op">!=</span><span class="dv">0</span>]))
+<span class="kw">cat</span>(<span class="st">&quot;c =&quot;</span>,c )
+<span class="co">#&gt; c = 12 7 2 2 2 1 1 1 1 1 1 1 1 1 1 1 1</span></code></pre></div>
+<p>For what follows, we define the <code>data</code> object. It must be a list containing the observed subtree sizes, the number of observed cases and the number of observed subtrees.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">data &lt;-<span class="st"> </span><span class="kw">list</span>(
+ <span class="dt">c =</span> c, 
+ <span class="dt">N =</span> <span class="kw">sum</span>(c), 
+ <span class="dt">K =</span> <span class="kw">length</span>(c)
+)</code></pre></div>
+<p>Moreover, we need to save the true parameter values: <code>alpha</code>, <code>p</code>, <code>K_tilde</code> the number of true subtrees, <code>c_tilde</code> and <code>r</code> the number of non-observed cases.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">truth &lt;-<span class="st"> </span><span class="kw">list</span>(
+ <span class="dt">alpha   =</span> alpha_truth, 
+ <span class="dt">p       =</span> p_truth, 
+ <span class="dt">K_tilde =</span> <span class="kw">length</span>(c_tilde),
+ <span class="dt">c_tilde =</span> c_tilde,
+ <span class="co"># t = rep(1:length(c_tilde),times=c_tilde),</span>
+ <span class="dt">r       =</span> N_tilde <span class="op">-</span><span class="st"> </span>data<span class="op">$</span>N 
+)</code></pre></div>
+<h3 id="hyperparameters">Hyperparameters</h3>
+<p>Now, we shall define the <code>hyperparameter</code> object. Some hyperparameters depends on prior information, and in the following we fix the prior information so that is consistent with the true values. We consider that we have a prior information about the proportion sampling, <code>p0</code>. From <code>p0</code> and the data, we can deduce a prior value for <code>r</code>, that we denote by <code>r0</code>. Then, we can derive from these prior values and the data, a prior value for some hyperparameters: <code>eta1</code>, <code>eta2</code>, <code>pi</code> and <code>kappa</code>.</p>
+<p>Some other hyperparameters should be empirically estimated. For instance, the prior hyperparameters <code>lambda1</code> and <code>lambda2</code> are fixed so that the prior mean (resp. variance) of <code>alpha</code> is <span class="math inline">\(\hat \alpha\)</span> (resp. <span class="math inline">\(\hat \alpha\)</span>), which is the maximum likelihood estimate of <span class="math inline">\(\alpha\)</span>. We choose this value since a vague prior on <span class="math inline">\(\alpha\)</span> leads to weak results. Then, we inform the prior with the likely mean value and we specify a large variance (same scale as the mean) so that the posterior distribution of <code>alpha</code> is not forced to be around the prior mean.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">### Empirical Bayes ----
+alpha_hat &lt;-<span class="st"> </span><span class="kw">alpha_estimator</span>(data<span class="op">$</span>c,<span class="dt">alpha_lim=</span><span class="kw">c</span>(<span class="dv">1</span>,<span class="dv">50</span>))<span class="op">$</span>alpha_hat
+alpha_hat
+<span class="co">#&gt; [1] 11.58996</span>
+
+### Prior information ----
+p0 &lt;-<span class="st"> </span>p_truth
+r0 &lt;-<span class="st"> </span>data<span class="op">$</span>N<span class="op">*</span>(<span class="dv">1</span><span class="op">-</span>p0)<span class="op">/</span>p0
+
+### Hyperparam ----
+hyperparam &lt;-<span class="st"> </span><span class="kw">list</span>(
+ <span class="dt">lambda1  =</span> alpha_hat<span class="op">^</span><span class="dv">2</span>,
+ <span class="dt">lambda2  =</span> alpha_hat,
+ <span class="dt">eta1 =</span> data<span class="op">$</span>N<span class="op">+</span><span class="dv">1</span>,
+ <span class="dt">eta2 =</span> data<span class="op">$</span>N<span class="op">*</span>(<span class="dv">1</span><span class="op">-</span>p0)<span class="op">/</span>p0<span class="op">+</span><span class="dv">1</span>,
+ <span class="dt">pi    =</span> <span class="dv">1</span><span class="op">-</span>p0,         
+ <span class="dt">kappa =</span> data<span class="op">$</span>N
+)</code></pre></div>
+<p>We now specify some options for the posterior sampler:</p>
+<ul>
+<li><code>burnin</code>: To ignore the first iterations for which we claim that the sampler has supposedly not converged.</li>
+<li><code>thin</code>: To keep only 1 iterations every <code>thin</code> iterations to lower the chain autocorrelation.</li>
+<li><code>temperature</code>: The temperature values of each parallel chains. The length of <code>temperature</code> determines the number of chains to compute. Each temperature should belong to <span class="math inline">\((0,1]\)</span> and one of them must be equalt ot one.<br />
+</li>
+<li><code>lambda</code>: The value is related to <span class="math inline">\(n_\text{swap}\)</span>, the number of chains swap at each iterations. For each iteration, <span class="math inline">\(n_\text{swap} \sim \operatorname{Pois}(\lambda)\)</span>.<br />
+</li>
+<li><code>n_iter</code>: The length of the output (posterior sample) adjusted to <code>burnin</code> and <code>thin</code>.</li>
+</ul>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">### Options ----
+param &lt;-<span class="st"> </span><span class="kw">list</span>(<span class="dt">n_iter =</span> <span class="fl">1e4</span>)</code></pre></div>
+<button onclick="hide('Preprocess')">
+Hide ‘Preprocess’
+</button>
+</div>
+</div>
+<div id="application" class="section level1">
+<h1>Application</h1>
+<button onclick="show_hide('Application')">
+Show/Hide
+</button>
+<div id="Application">
+<p>In this Section, we firstly show how to obtain a prior sample, by using a Metropolis Algorithm.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">param_prior &lt;-<span class="st"> </span>param
+param_prior<span class="op">$</span>target &lt;-<span class="st"> &quot;prior&quot;</span>
+
+prior_sample &lt;-<span class="st"> </span><span class="kw">MH_cpp</span>(param_prior,data,hyperparam,<span class="ot">TRUE</span>)</code></pre></div>
+<p>Concerning the posterior distribution, we need to use another algorithm. With the following command, we run the Parallel Tempering algorithm to sample from the target distribution <span class="math inline">\(\pi\)</span>. The Parallel Tempering algorithm compute few Markov chains with different target distributions <span class="math inline">\(\pi_i\)</span> for <span class="math inline">\(i=1, \dots, T\)</span>, which are all related to <span class="math inline">\(\pi\)</span> and one of them must be <span class="math inline">\(\pi\)</span>. The main idea is to propose swap moves between chains, according to a correct acceptance probability in order to preserve the invariant distribution of each chain. The swap moves allow the chains to escape from local traps and lead to a Markov chain with a low autocorrelation. Finally, we only keep the Markov chain for which the target distribution is <span class="math inline">\(\pi\)</span>.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">### Posterior sampler ----
+param<span class="op">$</span>temperatures &lt;-<span class="st"> </span><span class="kw">c</span>(<span class="dv">1</span>,<span class="fl">0.8</span>,<span class="fl">0.6</span>,<span class="fl">0.4</span>)
+posterior_sample &lt;-<span class="st"> </span><span class="kw">PT_cpp</span>(param,data,hyperparam,<span class="ot">TRUE</span>)
+<span class="co">#&gt; Burnin done.</span></code></pre></div>
+<p>In the remainder of this Section, we describe the <code>prior_sample</code> and <code>posterior_sample</code> objects and we show how to obtain some results and some plots.</p>
+<p>About the prior, the <code>prior_sample</code> object is a list for which items are:</p>
+<ol style="list-style-type: decimal">
+<li>a sample for each model parameters and</li>
+<li>information about the sampler algorithm (the acceptance probability and the acceptance rate).</li>
+</ol>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">### The object structure ----
+<span class="kw">str</span>(prior_sample)
+<span class="co">#&gt; List of 8</span>
+<span class="co">#&gt;  $ r             : num [1:10000, 1] 12 13 7 17 19 10 21 9 14 19 ...</span>
+<span class="co">#&gt;  $ p             : num [1:10000, 1] 0.662 0.643 0.737 0.728 0.622 ...</span>
+<span class="co">#&gt;  $ K_tilde       : num [1:10000, 1] 20 20 18 21 21 19 22 19 21 20 ...</span>
+<span class="co">#&gt;  $ alpha         : num [1:10000, 1] 12.49 11 10.76 10.36 9.76 ...</span>
+<span class="co">#&gt;  $ c_tilde_assign: num [1:10000, 1:73] 1 1 1 1 1 1 1 1 1 1 ...</span>
+<span class="co">#&gt;  $ c_tilde       : num [1:10000, 1:29] 13 16 15 16 17 14 21 14 17 17 ...</span>
+<span class="co">#&gt;  $ accepted      : num [1:10000, 1] 1 1 1 1 1 1 1 1 1 1 ...</span>
+<span class="co">#&gt;  $ acc_ratio     : num [1:10000, 1] 1 1 1 1 1 1 1 1 1 1 ...</span>
+
+### Traces ----
+<span class="kw">par</span>(<span class="dt">mfrow=</span><span class="kw">c</span>(<span class="dv">2</span>,<span class="dv">2</span>))
+<span class="kw">plot</span>(prior_sample<span class="op">$</span>alpha,<span class="dt">type=</span><span class="st">&quot;l&quot;</span>,<span class="dt">main=</span><span class="st">&quot;alpha&quot;</span>,<span class="dt">xlab=</span><span class="st">&quot;&quot;</span>,<span class="dt">ylab=</span><span class="st">&quot;&quot;</span>)
+<span class="kw">plot</span>(prior_sample<span class="op">$</span>p,<span class="dt">type=</span><span class="st">&quot;l&quot;</span>,<span class="dt">main=</span><span class="st">&quot;p&quot;</span>,<span class="dt">xlab=</span><span class="st">&quot;&quot;</span>,<span class="dt">ylab=</span><span class="st">&quot;&quot;</span>)
+<span class="kw">plot</span>(prior_sample<span class="op">$</span>K_tilde,<span class="dt">type=</span><span class="st">&quot;l&quot;</span>,<span class="dt">main=</span><span class="st">&quot;K_tilde&quot;</span>,<span class="dt">xlab=</span><span class="st">&quot;&quot;</span>,<span class="dt">ylab=</span><span class="st">&quot;&quot;</span>)
+<span class="kw">matplot</span>(prior_sample<span class="op">$</span>c_tilde,<span class="dt">type=</span><span class="st">&quot;l&quot;</span>,<span class="dt">main=</span><span class="st">&quot;c_tilde&quot;</span>,<span class="dt">xlab=</span><span class="st">&quot;&quot;</span>,<span class="dt">ylab=</span><span class="st">&quot;&quot;</span>)</code></pre></div>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
+<p>About the posterior, the <code>posterior_sample</code> object is a list with more items:</p>
+<ol style="list-style-type: decimal">
+<li>the first item, <code>trace</code>, contains lists, as the <code>prior_sample</code> object, which are contains information about all the computed Markov chains, and</li>
+<li>an item, <code>comput_time</code>, which is the computation time of the Parallele Tempering algorithm.</li>
+</ol>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">### The object structure ----
+<span class="kw">str</span>(posterior_sample)
+<span class="co">#&gt; List of 2</span>
+<span class="co">#&gt;  $ trace      :List of 8</span>
+<span class="co">#&gt;   ..$ r             : num [1:10000, 1:4] 8 15 16 15 15 13 10 10 11 8 ...</span>
+<span class="co">#&gt;   ..$ p             : num [1:10000, 1:4] 0.664 0.733 0.675 0.733 0.733 ...</span>
+<span class="co">#&gt;   ..$ K_tilde       : num [1:10000, 1:4] 17 19 17 19 19 18 17 17 18 19 ...</span>
+<span class="co">#&gt;   ..$ alpha         : num [1:10000, 1:4] 12.2 11.8 13 11.8 11.8 ...</span>
+<span class="co">#&gt;   ..$ c_tilde_assign: num [1:10000, 1:4, 1:69] 1 1 1 1 1 1 1 1 1 1 ...</span>
+<span class="co">#&gt;   ..$ c_tilde       : num [1:10000, 1:4, 1:27] 13 15 16 15 15 20 18 18 15 14 ...</span>
+<span class="co">#&gt;   ..$ accepted      : num [1:10000, 1:4] 1 1 0 1 0 0 0 0 0 0 ...</span>
+<span class="co">#&gt;   ..$ acc_ratio     : num [1:10000, 1:4] 1 0.27016 0.21573 0.43356 0.00338 ...</span>
+<span class="co">#&gt;  $ comput_time: num 3.68</span>
+
+### Traces ----
+<span class="kw">par</span>(<span class="dt">mfrow=</span><span class="kw">c</span>(<span class="dv">2</span>,<span class="dv">2</span>))
+<span class="kw">plot</span>(posterior_sample<span class="op">$</span>trace<span class="op">$</span>alpha[,<span class="dv">1</span>],<span class="dt">type=</span><span class="st">&quot;l&quot;</span>,<span class="dt">main=</span><span class="st">&quot;alpha&quot;</span>,<span class="dt">xlab=</span><span class="st">&quot;&quot;</span>,<span class="dt">ylab=</span><span class="st">&quot;&quot;</span>)
+<span class="kw">plot</span>(posterior_sample<span class="op">$</span>trace<span class="op">$</span>p[,<span class="dv">1</span>],<span class="dt">type=</span><span class="st">&quot;l&quot;</span>,<span class="dt">main=</span><span class="st">&quot;p&quot;</span>,<span class="dt">xlab=</span><span class="st">&quot;&quot;</span>,<span class="dt">ylab=</span><span class="st">&quot;&quot;</span>)
+<span class="kw">plot</span>(posterior_sample<span class="op">$</span>trace<span class="op">$</span>K_tilde[,<span class="dv">1</span>],<span class="dt">type=</span><span class="st">&quot;l&quot;</span>,<span class="dt">main=</span><span class="st">&quot;K_tilde&quot;</span>,<span class="dt">xlab=</span><span class="st">&quot;&quot;</span>,<span class="dt">ylab=</span><span class="st">&quot;&quot;</span>)
+<span class="kw">matplot</span>(posterior_sample<span class="op">$</span>trace<span class="op">$</span>c_tilde[,<span class="dv">1</span>,],<span class="dt">type=</span><span class="st">&quot;l&quot;</span>,<span class="dt">main=</span><span class="st">&quot;c_tilde&quot;</span>,<span class="dt">xlab=</span><span class="st">&quot;&quot;</span>,<span class="dt">ylab=</span><span class="st">&quot;&quot;</span>)</code></pre></div>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
+<button onclick="hide('Application')">
+Hide ‘Application’
+</button>
+</div>
+</div>
+<div id="mixing-and-posterior-checkings" class="section level1">
+<h1>Mixing and posterior checkings</h1>
+<button onclick="show_hide('checkings')">
+Show/Hide
+</button>
+<div id="checkings">
+<p>In the previous Section, we show some trace plots which could be used as first checks to assess the convergence of the Markov chain. In the following, we give more information about the chains:</p>
+<ol style="list-style-type: decimal">
+<li>we run some tests from the <code>coda</code> package,</li>
+<li>we show how to compute the estimation error,</li>
+<li>we check that the true parameter is in the credible interval and</li>
+<li>we study the posterior predictive distribution.</li>
+</ol>
+<p>As additional information, we also give the Effective Sample Size (ESS) and the (log)-densities of the sample. (Just notice that the normalization constant could be efficiently estimated by considering all the samples, even those with a temperature different to 1, see <a href="https://arxiv.org/pdf/1808.07730.pdf">Buchholz et al. (2018)</a>)</p>
+<h3 id="coda-tests">Coda tests</h3>
+<button onclick="show_hide('tests')">
+Show/Hide
+</button>
+<div id="tests">
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">threshold &lt;-<span class="st"> </span><span class="fl">0.01</span></code></pre></div>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">mcmc_alpha &lt;-<span class="st"> </span><span class="kw">as.mcmc</span>(posterior_sample<span class="op">$</span>trace<span class="op">$</span>alpha[,<span class="dv">1</span>])
+
+geweke_z_alpha    &lt;-<span class="st"> </span><span class="kw">geweke.diag</span>(mcmc_alpha)
+geweke_z_alpha    &lt;-<span class="st"> </span><span class="dv">1</span><span class="op">-</span><span class="kw">pnorm</span>(<span class="kw">abs</span>(geweke_z_alpha<span class="op">$</span>z),<span class="dv">0</span>,<span class="dv">1</span>)</code></pre></div>
+<pre><code>#&gt; The p-value of the Geweke test is : 0.201242 . Then the null hypothesis is not rejected: the means of the first part and the last part of the Markov chain are not significatively different, which could be an evidence in support of the convergence of the chain.</code></pre>
+<p>The reader should be aware that using a hypothesis test is controversial. As least, this test should be computed several times on independent posterior samples to check how many frequently the null hypothesis is rejected or not, or to check if the p-values seem to be uniform between 0 and 1 (which should be the case if assuming the null hypothesis) (a <span class="math inline">\(\chi^2\)</span>-test could be used to this end, but this is “the snake that bites its tail”).</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">heildel_sta_alpha &lt;-<span class="st"> </span><span class="kw">heidel.diag</span>(mcmc_alpha)[<span class="dv">3</span>]</code></pre></div>
+<pre><code>#&gt; The p-value of the Heidelberger and Welch's test is : 0.06733429 . Then the null hypothesis is not rejected: the sample values come from a stationary distribution.</code></pre>
+<button onclick="hide('tests')">
+Hide ‘Coda tests’
+</button>
+</div>
+<h3 id="error">Error</h3>
+<button onclick="show_hide('Error')">
+Show/Hide
+</button>
+<div id="Error">
+<p>In this Section, we compute the (Euclidean) distances between the estimates and the true values, for each model parameter.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">summaries &lt;-<span class="st"> </span><span class="kw">compute_summaries</span>(posterior_sample<span class="op">$</span>trace,truth)</code></pre></div>
+<pre><code>#&gt; The difference between the true alpha and the estimate is:  -1.509083</code></pre>
+<pre><code>#&gt; The difference between the true p and the estimate is:  -0.0349718</code></pre>
+<pre><code>#&gt; The difference between the true r and the estimate is:  3.3106</code></pre>
+<pre><code>#&gt; The difference between the true K_tilde and the estimate is:  4.201</code></pre>
+<button onclick="hide('Error')">
+Hide ‘Error’
+</button>
+</div>
+<h3 id="credible-interval">Credible interval</h3>
+<button onclick="show_hide('CI')">
+Show/Hide
+</button>
+<div id="CI">
+<p>In this Section, we check if the true value of the model parameters belong to the credible interval.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">CIs &lt;-<span class="st"> </span><span class="kw">compute_CI</span>(posterior_sample<span class="op">$</span>trace)
+
+summaries2 &lt;-<span class="st"> </span><span class="kw">CI_covering</span>(posterior_sample<span class="op">$</span>trace,truth)
+summaries2<span class="op">$</span>c_tilde &lt;-<span class="st"> </span><span class="kw">as.logical</span>(<span class="kw">prod</span>(summaries2<span class="op">$</span>c_tilde))</code></pre></div>
+<pre><code>#&gt; The true value of alpha ( 10 ) is in the credible interval:  [ 9.735913 , 13.68314 ]</code></pre>
+<pre><code>#&gt; The true value of p ( 0.7 ) is in the credible interval:  [ 0.6363501 , 0.8123301 ]</code></pre>
+<pre><code>#&gt; The true value of r ( 13 ) is in the credible interval:  [ 3 , 17 ]</code></pre>
+<pre><code>#&gt; The true value of K ( 22 ) is not in the credible interval:  [ 17 , 20 ]</code></pre>
+<p>For the parameter <code>c_tilde</code> it is better the plot the credible interval.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">xlim &lt;-<span class="st"> </span><span class="kw">c</span>(<span class="dv">1</span>, 
+          <span class="kw">max</span>(<span class="kw">ncol</span>(CIs<span class="op">$</span>c_tilde),<span class="kw">length</span>(truth<span class="op">$</span>c_tilde)))
+ylim &lt;-<span class="st"> </span><span class="kw">c</span>(<span class="dv">0</span>,
+          <span class="kw">max</span>(CIs<span class="op">$</span>c_tilde[,<span class="dv">1</span>],truth<span class="op">$</span>c_tilde[<span class="dv">1</span>]))
+
+<span class="kw">matplot</span>(<span class="kw">t</span>(CIs<span class="op">$</span>c_tilde),<span class="dt">type=</span><span class="st">&quot;o&quot;</span>,<span class="dt">lty=</span><span class="dv">2</span>,<span class="dt">pch=</span><span class="dv">16</span>,<span class="dt">col=</span><span class="st">&quot;gray&quot;</span>,<span class="dt">xlim=</span>xlim,<span class="dt">ylim=</span>ylim)
+<span class="kw">lines</span>(truth<span class="op">$</span>c_tilde,<span class="dt">type=</span><span class="st">&quot;o&quot;</span>)</code></pre></div>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
+<pre><code>#&gt; In this case, we see that the true subtree sizes are not in the credible interval,  since at least one true subtree size is not in the marginal credible interval.</code></pre>
+<p>Again, the computations in this section should be repeat several times to assess the validity of the method.</p>
+<button onclick="hide('CI')">
+Hide ‘Credible interval’
+</button>
+</div>
+<h3 id="posterior-predictive-distribution">Posterior predictive distribution</h3>
+<button onclick="show_hide('predictive')">
+Show/Hide
+</button>
+<div id="predictive">
+<p>In this Section, we investigate if the observed subtree sizes are in the credible interval of the posterior predictive distribution. First, we check for all the iterations of the posterior sampler: at each iteration the credible interval is computed.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">### CI posterior predictive ----
+burnin &lt;-<span class="st"> </span><span class="dv">10</span>
+q1 &lt;-<span class="st"> </span><span class="fl">0.025</span> ; q2 &lt;-<span class="st"> </span><span class="dv">1</span><span class="op">-</span>q1
+in_CI &lt;-<span class="st"> </span><span class="ot">NULL</span>
+<span class="cf">for</span>(k <span class="cf">in</span> (burnin<span class="op">+</span><span class="dv">2</span>)<span class="op">:</span><span class="kw">length</span>(posterior_sample<span class="op">$</span>trace<span class="op">$</span>alpha[,<span class="dv">1</span>])){
+ c_tmp &lt;-<span class="st"> </span>posterior_sample<span class="op">$</span>trace<span class="op">$</span>c_tilde[k,<span class="dv">1</span>,]
+ c_tmp &lt;-<span class="st"> </span>c_tmp[c_tmp <span class="op">!=</span><span class="st"> </span><span class="dv">0</span>]
+ 
+ p_tmp &lt;-<span class="st"> </span>posterior_sample<span class="op">$</span>trace<span class="op">$</span>p[k,<span class="dv">1</span>]
+ 
+ c_data_tmp &lt;-<span class="st"> </span>data<span class="op">$</span>c
+ c_data_tmp &lt;-<span class="st"> </span><span class="kw">c</span>(c_data_tmp,<span class="kw">rep</span>(<span class="dv">0</span>,<span class="kw">length</span>(c_tmp)<span class="op">-</span><span class="kw">length</span>(c_data_tmp)))
+ 
+ in_CI_tmp &lt;-<span class="st"> </span><span class="ot">TRUE</span>
+ <span class="cf">for</span>(j <span class="cf">in</span> <span class="dv">1</span><span class="op">:</span><span class="kw">length</span>(c_tmp)){
+  in_CI_tmp &lt;-<span class="st"> </span>in_CI_tmp <span class="op">&amp;</span><span class="st"> </span>(phyloCRP<span class="op">:::</span><span class="st">&quot;%between%&quot;</span>(c_data_tmp[j], 
+                                                   <span class="kw">qbinom</span>(p_tmp,c_tmp[j],<span class="dt">prob=</span><span class="kw">c</span>(q1,q2))) )
+ }
+ in_CI &lt;-<span class="st"> </span><span class="kw">c</span>(in_CI,in_CI_tmp)
+}</code></pre></div>
+<pre><code>#&gt; For all the iterations, the observed subtree sizes are: 
+#&gt;  9989 times in the credible interval of the posterior predictive distribution, and 
+#&gt;   0 times outside the credible interval of the posterior predictive distribution.</code></pre>
+<p>Second, we compute the credible interval with the estimate of <code>p</code> and <code>c_tilde</code>.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">### CI posterior predictive ----
+q1 &lt;-<span class="st"> </span><span class="fl">0.025</span> ; q2 &lt;-<span class="st"> </span><span class="dv">1</span><span class="op">-</span>q1
+
+indexes &lt;-<span class="st"> </span><span class="kw">which</span>(<span class="kw">names</span>(summaries) <span class="op">==</span><span class="st"> &quot;c_tilde_mean&quot;</span>)
+c_tmp &lt;-<span class="st"> </span><span class="kw">round</span>(summaries[indexes],<span class="dv">0</span>)
+
+p_tmp &lt;-<span class="st"> </span>summaries[<span class="st">&quot;p_mean&quot;</span>]
+
+c_data_tmp &lt;-<span class="st"> </span>data<span class="op">$</span>c
+<span class="cf">if</span>(<span class="kw">length</span>(c_tmp)<span class="op">-</span><span class="kw">length</span>(c_data_tmp) <span class="op">&gt;</span><span class="st"> </span><span class="dv">0</span>)
+ c_data_tmp &lt;-<span class="st"> </span><span class="kw">c</span>(c_data_tmp,<span class="kw">rep</span>(<span class="dv">0</span>,<span class="kw">length</span>(c_tmp)<span class="op">-</span><span class="kw">length</span>(c_data_tmp)))
+
+in_CI_tmp &lt;-<span class="st"> </span><span class="ot">TRUE</span>
+CI_values &lt;-<span class="st"> </span><span class="ot">NULL</span>
+<span class="cf">for</span>(j <span class="cf">in</span> <span class="dv">1</span><span class="op">:</span><span class="kw">length</span>(c_tmp)){
+ CI_values &lt;-<span class="st"> </span><span class="kw">cbind</span>(CI_values,
+                    <span class="kw">qbinom</span>(p_tmp,c_tmp[j],<span class="dt">prob=</span><span class="kw">c</span>(q1,q2)))
+ in_CI_tmp &lt;-<span class="st"> </span>in_CI_tmp <span class="op">&amp;</span><span class="st"> </span>(phyloCRP<span class="op">:::</span><span class="st">&quot;%between%&quot;</span>(c_data_tmp[j], 
+                                                   <span class="kw">qbinom</span>(p_tmp,c_tmp[j],<span class="dt">prob=</span><span class="kw">c</span>(q1,q2))))
+}</code></pre></div>
+<pre><code>#&gt; With the estimate of p and c_tilde, the observed subtree sizes are  in the credible interval of the posterior predictive distribution.</code></pre>
+<button onclick="hide('predictive')">
+Hide ‘Posterior predictive distribution’
+</button>
+</div>
+<h3 id="effective-sample-size">Effective Sample Size</h3>
+<button onclick="show_hide('ESS')">
+Show/Hide
+</button>
+<div id="ESS">
+<p>Below, we give the ESS for <code>alpha</code>, <code>K_tilde</code>, <code>p</code> and <code>r</code> in order to have an idea of the number of iterations that we should run to obtain accurate estimates.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">ESS &lt;-<span class="st"> </span><span class="kw">c</span>(
+ <span class="kw">effectiveSize</span>(posterior_sample<span class="op">$</span>trace<span class="op">$</span>alpha[,<span class="dv">1</span>]),
+ <span class="kw">effectiveSize</span>(posterior_sample<span class="op">$</span>trace<span class="op">$</span>K_tilde[,<span class="dv">1</span>]),
+ <span class="kw">effectiveSize</span>(posterior_sample<span class="op">$</span>trace<span class="op">$</span>p[,<span class="dv">1</span>]),
+ <span class="kw">effectiveSize</span>(posterior_sample<span class="op">$</span>trace<span class="op">$</span>r[,<span class="dv">1</span>])
+)
+<span class="kw">names</span>(ESS) &lt;-<span class="st"> </span><span class="kw">c</span>(<span class="st">&quot;alpha&quot;</span>,<span class="st">&quot;K_tilde&quot;</span>,<span class="st">&quot;p&quot;</span>,<span class="st">&quot;r&quot;</span>)
+ESS
+<span class="co">#&gt;    alpha  K_tilde        p        r </span>
+<span class="co">#&gt; 507.2428 726.9932 463.1790 386.1460</span></code></pre></div>
+<button onclick="hide('ESS')">
+Hide ‘Effective Sample Size’
+</button>
+</div>
+<h3 id="density">Density</h3>
+<button onclick="show_hide('Density')">
+Show/Hide
+</button>
+<div id="Density">
+<p>Below, we show how to compute the (log-)posterior densities of the sample. Furthermore, we plot the trace of the log-posterior density in order to assess (by eyes) the convergence of the Markov chain.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">densities &lt;-<span class="st"> </span><span class="kw">log_dtarget_sample_cpp_PT</span>(posterior_sample<span class="op">$</span>trace,data,hyperparam,<span class="dv">1</span>)
+truth_density &lt;-<span class="st"> </span><span class="kw">log_dtarget</span>(truth,data,hyperparam)
+
+<span class="kw">head</span>(densities)
+<span class="co">#&gt;            [,1]         [,2]      [,3]         [,4]       [,5]         [,6]</span>
+<span class="co">#&gt; [1,]  -92.08465 1.018932e-40 -13.01339 2.230264e-06  -79.07126 4.568663e-35</span>
+<span class="co">#&gt; [2,] -112.24442 1.790064e-49 -14.32215 6.025180e-07  -97.92227 2.970972e-43</span>
+<span class="co">#&gt; [3,] -120.34612 5.424295e-53 -14.56847 4.709714e-07 -105.77765 1.151725e-46</span>
+<span class="co">#&gt; [4,] -112.24442 1.790064e-49 -14.32215 6.025180e-07  -97.92227 2.970972e-43</span>
+<span class="co">#&gt; [5,] -112.24442 1.790064e-49 -14.32215 6.025180e-07  -97.92227 2.970972e-43</span>
+<span class="co">#&gt; [6,]  -94.35095 1.056585e-41 -11.97328 6.310612e-06  -82.37767 1.674299e-36</span>
+densities &lt;-<span class="st"> </span><span class="kw">as.data.frame</span>(densities)
+<span class="kw">colnames</span>(densities) &lt;-<span class="st"> </span><span class="kw">c</span>(<span class="st">&quot;log_posterior&quot;</span>,<span class="st">&quot;posterior&quot;</span>,
+                    <span class="st">&quot;log_lkh&quot;</span>,<span class="st">&quot;lkh&quot;</span>,
+                    <span class="st">&quot;log_prior&quot;</span>,<span class="st">&quot;prior&quot;</span>)
+
+<span class="kw">plot</span>(densities<span class="op">$</span>log_posterior,<span class="dt">type=</span><span class="st">&quot;l&quot;</span>,<span class="dt">main=</span><span class="st">&quot;log posterior density&quot;</span>) ; <span class="kw">abline</span>(<span class="dt">h=</span>truth_density<span class="op">$</span>log_posterior,<span class="dt">col=</span><span class="dv">2</span>)</code></pre></div>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
+<button onclick="hide('Density')">
+Hide ‘Density’
+</button>
+</div>
+<button onclick="hide('checkings')">
+Hide ‘Mixing and posterior checkings’
+</button>
+</div>
+</div>
+<div id="results" class="section level1">
+<h1>Results</h1>
+<button onclick="show_hide('Results')">
+Show/Hide
+</button>
+<div id="Results">
+<p>In this Section, we show (or show again) how to compute the estimates, the credible intervals and the estimate of the quantity of interest: the proportion of introduction.</p>
+<h4 id="estimates">Estimates:</h4>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">alpha_est &lt;-<span class="st"> </span><span class="kw">mean</span>(posterior_sample<span class="op">$</span>trace<span class="op">$</span>alpha[,<span class="dv">1</span>])
+p_est &lt;-<span class="st"> </span><span class="kw">mean</span>(posterior_sample<span class="op">$</span>trace<span class="op">$</span>p[,<span class="dv">1</span>])
+r_est &lt;-<span class="st"> </span><span class="kw">median</span>(posterior_sample<span class="op">$</span>trace<span class="op">$</span>r[,<span class="dv">1</span>])
+K_est &lt;-<span class="st"> </span><span class="kw">median</span>(posterior_sample<span class="op">$</span>trace<span class="op">$</span>K_tilde[,<span class="dv">1</span>])
+
+c_est &lt;-<span class="st"> </span><span class="ot">NULL</span>
+<span class="cf">for</span>(j <span class="cf">in</span> <span class="dv">1</span><span class="op">:</span><span class="kw">ncol</span>(posterior_sample<span class="op">$</span>trace<span class="op">$</span>c_tilde[,<span class="dv">1</span>,])){
+ c_est &lt;-<span class="st"> </span><span class="kw">c</span>(c_est,
+            <span class="kw">median</span>(posterior_sample<span class="op">$</span>trace<span class="op">$</span>c_tilde[,<span class="dv">1</span>,j]))
+}</code></pre></div>
+<pre><code>#&gt; The estimate of alpha is: 11.50908
+#&gt; The estimate of p is: 0.7349718
+#&gt; The estimate of r is: 10
+#&gt; The estimate of K_tilde is: 18
+#&gt; The estimate of c_tilde is: 16 9 3 2 2 2 2 1 1 1 1 1 1 1 1 1 1 1</code></pre>
+<h4 id="credible-intervals">Credible intervals:</h4>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">CIs &lt;-<span class="st"> </span><span class="kw">compute_CI</span>(posterior_sample<span class="op">$</span>trace)</code></pre></div>
+<h4 id="estimated-proportion-of-introductions">Estimated proportion of introductions:</h4>
+<p>In this framework, the proportion of introductions is the number of cases divided by the number of subtrees.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">posterior_sample<span class="op">$</span>trace<span class="op">$</span>N_tilde &lt;-<span class="st"> </span><span class="kw">apply</span>(posterior_sample<span class="op">$</span>trace<span class="op">$</span>c_tilde[,<span class="dv">1</span>,],<span class="dv">1</span>,sum)
+PIs &lt;-<span class="st"> </span>posterior_sample<span class="op">$</span>trace<span class="op">$</span>K[,<span class="dv">1</span>] <span class="op">/</span><span class="st"> </span>posterior_sample<span class="op">$</span>trace<span class="op">$</span>N_tilde
+
+PI_estimate &lt;-<span class="st"> </span><span class="kw">mean</span>(PIs)
+PI_CI &lt;-<span class="st"> </span><span class="kw">quantile</span>(<span class="kw">sort</span>(PIs),<span class="kw">c</span>(<span class="fl">0.025</span>,<span class="fl">0.975</span>))
+
+<span class="kw">plot</span>(PIs,<span class="dt">type=</span><span class="st">&quot;l&quot;</span>,<span class="dt">ylab=</span><span class="st">&quot;Importance rate&quot;</span>,<span class="dt">xlab=</span><span class="st">&quot;Iteration&quot;</span>)</code></pre></div>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
+<pre><code>#&gt; The estimate of the proportion of introductions is  0.3828679  ( 0.3272727 - 0.4347826 ).</code></pre>
+<button onclick="hide('Results')">
+Hide ‘Results’
+</button>
+</div>
+</div>
+
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
